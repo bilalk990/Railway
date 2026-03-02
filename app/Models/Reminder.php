@@ -15,7 +15,14 @@ class Reminder extends Model
         'festival_id',
         'date',
         'time',
+        'is_recurring',
+        'sent',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 
     public function festival()
     {
