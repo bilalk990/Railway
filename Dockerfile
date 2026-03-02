@@ -18,6 +18,13 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . .
 
+# Copy Apache config (proper file, not inline printf)
+COPY docker/000-default.conf /etc/apache2/sites-available/000-default.conf
+
+# Copy startup script
+COPY docker/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
 # Create required storage directories
 RUN mkdir -p storage/framework/cache/data \
     storage/framework/sessions \
@@ -35,25 +42,5 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 # Set permissions again after composer
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 storage bootstrap/cache
-
-# Write proper Apache VirtualHost config with AllowOverride
-RUN printf '<VirtualHost *:80>\n\
-    DocumentRoot /var/www/html\n\
-    <Directory /var/www/html>\n\
-    Options Indexes FollowSymLinks\n\
-    AllowOverride All\n\
-    Require all granted\n\
-    </Directory>\n\
-    ErrorLog ${APACHE_LOG_DIR}/error.log\n\
-    CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
-    </VirtualHost>\n' > /etc/apache2/sites-available/000-default.conf
-
-# Write startup script that sets PORT at runtime
-RUN printf '#!/bin/bash\n\
-    PORT="${PORT:-8080}"\n\
-    sed -i "s/Listen 80/Listen $PORT/" /etc/apache2/ports.conf\n\
-    sed -i "s/*:80/*:$PORT/" /etc/apache2/sites-available/000-default.conf\n\
-    exec apache2-foreground\n' > /usr/local/bin/start.sh \
-    && chmod +x /usr/local/bin/start.sh
 
 CMD ["bash", "/usr/local/bin/start.sh"]
