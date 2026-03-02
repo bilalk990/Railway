@@ -44,17 +44,19 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage \
     && chmod -R 775 /var/www/html/bootstrap/cache
 
-# Configure Apache to serve from project root
-RUN sed -i 's|/var/www/html|/var/www/html|g' /etc/apache2/sites-available/000-default.conf
+# Configure Apache - Allow .htaccess overrides
+RUN echo '<Directory /var/www/html>\n\
+    Options Indexes FollowSymLinks\n\
+    AllowOverride All\n\
+    Require all granted\n\
+    </Directory>' > /etc/apache2/conf-available/laravel.conf \
+    && a2enconf laravel
 
-# Allow .htaccess overrides
-RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+# Create entrypoint script that sets PORT at runtime
+RUN echo '#!/bin/bash\n\
+    sed -i "s/Listen 80/Listen ${PORT:-8080}/" /etc/apache2/ports.conf\n\
+    sed -i "s/:80/:${PORT:-8080}/" /etc/apache2/sites-available/000-default.conf\n\
+    apache2-foreground' > /usr/local/bin/start.sh \
+    && chmod +x /usr/local/bin/start.sh
 
-# Set Apache to listen on Railway's PORT
-RUN sed -i 's/80/${PORT}/g' /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
-
-# Expose port
-EXPOSE ${PORT}
-
-# Start Apache
-CMD ["apache2-foreground"]
+CMD ["/usr/local/bin/start.sh"]
