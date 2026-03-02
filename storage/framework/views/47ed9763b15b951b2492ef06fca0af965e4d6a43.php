@@ -1,1 +1,0 @@
-<?php echo $messageBody; ?>	<?php /**PATH /home/melosync/web/melosyncpanel.stage04.obdemo.com/public_html/resources/views/emails/template.blade.php ENDPATH**/ ?>

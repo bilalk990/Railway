@@ -7,10 +7,8 @@ Use Redirect;
 use Response;
 use DB;
 use Config;
-use Input;
 use Illuminate\Http\Request;
 use App;
-use App\Model\MobileApiLog;
 
 class AuthApi
 {
@@ -22,12 +20,12 @@ class AuthApi
     * @return mixed
     */
     public function handle($request, Closure $next){
+        
 		if(!empty($request->header('Accept-Language'))){
 			App::setLocale($request->header('Accept-Language'));
 		}else{
 			App::setLocale("en");
 		}
-		 
 		if(!empty(Auth::guard('api')->guest())){
 			$response				=	array();
 			$response["status"]		=	"error";

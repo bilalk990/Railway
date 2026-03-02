@@ -3,7 +3,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use App\Model\Admin;
+use App\Models\Admin;
 use App\Models\AclAdminAction;
 use Illuminate\Support\Facades\Auth;
 Use Redirect;
@@ -58,7 +58,7 @@ class AuthAdmin
                     $permissionData_check   =	DB::table("user_permission_actions")->where('user_id',$user_id)->where('admin_module_action_id',$data->id)->where('is_active',"1")->first();
                     if(empty($permissionData_check)){
                         Session::flash('error', trans("You are not authorized to access this page.")); 
-                        return back();die;
+                        return back();
                     }
                 }
             }

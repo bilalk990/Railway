@@ -1,11 +1,11 @@
 <?php
 
 use App\Models\Acl;
-use  App\Models\Department;
+
 use  App\Models\Designation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Model\User;
+
 use App\Models\Language;
 use App\Models\HomeUpdate;
 use App\Models\HomeUpdateDescription;
@@ -252,6 +252,12 @@ function setting($key='')
 function image_size_Get($value='')
 {
   return number_format(File::size($value)/1024,2);
+}
+
+function currentLangId()
+{
+    
+    return DB::table('languages')->where('lang_code',request()->header('Accept-Language'))->value('id');
 }
 
 

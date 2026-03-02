@@ -1,4 +1,5 @@
 <?php
+// app/Console/Kernel.php
 
 namespace App\Console;
 
@@ -8,6 +9,15 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 class Kernel extends ConsoleKernel
 {
     /**
+     * The Artisan commands provided by your application.
+     *
+     * @var array
+     */
+    protected $commands = [
+        \App\Console\Commands\SendDailyFestivalNotifications::class,
+    ];
+
+    /**
      * Define the application's command schedule.
      *
      * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
@@ -15,7 +25,14 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        // Run festival and reminder notifications every minute to match exact times
+        $schedule->command('notifications:daily-festival')
+                 ->everyMinute()
+                 ->timezone('Asia/Kolkata') // Adjust to your timezone
+                 ->appendOutputTo(storage_path('logs/festival-notifications.log'));
+        
+        // Optional: Test the command every minute (for testing only)
+        // $schedule->command('notifications:daily-festival')->everyMinute();
     }
 
     /**

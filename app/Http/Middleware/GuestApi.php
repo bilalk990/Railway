@@ -7,10 +7,8 @@ Use Redirect;
 use Response;
 use DB;
 use Config;
-use Input;
 use Illuminate\Http\Request;
 use App;
-use App\Model\MobileApiLog;
 
 class GuestApi
 {

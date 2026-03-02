@@ -1,1 +1,0 @@
-<?php echo $messageBody; ?>	<?php /**PATH /home/zaz/web/zaz.dev.obdemo.com/public_html/resources/views/emails/template.blade.php ENDPATH**/ ?>

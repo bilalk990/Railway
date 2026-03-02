@@ -19,7 +19,8 @@ class User extends Authenticatable
      * @var array
      */
     protected $fillable = [
-        'name', 'email', 'password',
+        'name', 'email', 'password', 'social_id', 'phone_prefix', 'phone_country_code',
+        'phone_number', 'country', 'state', 'language', 'notify', 'is_verified', 'is_active', 'image',
     ];
  
     /**
@@ -53,5 +54,10 @@ class User extends Authenticatable
     //     }
     //     return $value;
     // }
+
+    public function deviceTokens()
+{
+    return $this->hasMany(UserDeviceToken::class, 'user_id');
+}
        
 }
