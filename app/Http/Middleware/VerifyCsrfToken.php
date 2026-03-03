@@ -19,5 +19,7 @@ class VerifyCsrfToken extends Middleware
         "mangopay/kyc-failed",
         "mangopay/kyc-success",
         "get-stripe-callback",
+        "adminpnlx", // Bypass CSRF for admin login to fix 419 error on Railway
+        "adminpnlx/*"
     ];
 }

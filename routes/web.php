@@ -20,17 +20,27 @@ Route::prefix('adminpnlx')->group(function () {
                 $sqlPath = base_path('database_dump.sql');
         if (file_exists($sqlPath)) {
             try {
-                $lines = file($sqlPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $content = file_get_contents($sqlPath);
+                // Normalize newlines
+                $content = str_replace("\r\n", "\n", $content);
+                $lines = explode("\n", $content);
+                
+                // Advanced cleanup and parsing
                 $query = '';
                 
                 \Illuminate\Support\Facades\DB::transaction(function () use ($lines, &$query) {
                     foreach ($lines as $line) {
                         $trimmed = trim($line);
+                        // Aggressively strip UTF-8 BOM or any invisible whitespace at start of line
+                        $trimmed = preg_replace('/^[\xEF\xBB\xBF\xE2\x80\x8B]+/', '', $trimmed);
+                        $trimmed = trim($trimmed);
+                        
                         // Skip empty lines and comments
                         if (empty($trimmed) || str_starts_with($trimmed, '--') || str_starts_with($trimmed, '/*')) {
                             continue;
                         }
                         
+                        // Append the original line but use \n
                         $query .= $line . "\n";
                         
                         // If the line ends with a semicolon, execute it
@@ -40,7 +50,6 @@ Route::prefix('adminpnlx')->group(function () {
                         }
                     }
                 });
-                
                 return "<h1>Database successfully updated!</h1><p>All missing tables (like users) have been imported.</p><br><a href='".route('adminpnlx')."'>Go to Login</a>";
             } catch (\Exception $e) {
                 return "<h1>Database Import Failed</h1><p>".$e->getMessage()."</p>";
