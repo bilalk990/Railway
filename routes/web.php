@@ -16,12 +16,15 @@ Route::prefix('adminpnlx')->group(function () {
     
     // TEMPORARY: Force login and reset admin password to check what's wrong
     Route::get('/force-login', function() {
-        \Illuminate\Support\Facades\DB::table('admins')->where('email', 'admin@admin.com')->update([
-            'password' => \Illuminate\Support\Facades\Hash::make('Admin@123'),
-            'is_active' => 1,
-            'is_deleted' => 0
-        ]);
-        $admin = \App\Models\Admin::where('email', 'admin@admin.com')->first();
+        $admin = \App\Models\Admin::updateOrCreate(
+            ['email' => 'admin@admin.com'],
+            [
+                'name' => 'Admin',
+                'password' => \Illuminate\Support\Facades\Hash::make('Admin@123'),
+                'is_active' => 1,
+                'is_deleted' => 0
+            ]
+        );
         auth()->guard('admin')->login($admin);
         return redirect()->route('dashboard');
     });
