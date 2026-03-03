@@ -17,24 +17,26 @@ Route::prefix('adminpnlx')->group(function () {
     // TEMPORARY: Route to import the missing database tables from the dump
     Route::get('/import-db', function() {
         set_time_limit(300); // Allow sufficient time for large SQL import
-        $sqlPath = base_path('database_dump.sql');
+                $sqlPath = base_path('database_dump.sql');
         if (file_exists($sqlPath)) {
             try {
-                $sql = file_get_contents($sqlPath);
+                $lines = file($sqlPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $query = '';
                 
-                // Advanced cleanup and parsing to avoid PDO choking
-                $sql = preg_replace('/^\s*--.*$/m', '', $sql); // remove -- comments
-                $sql = preg_replace('/^\s*\/\*!.*?\*\/;$/m', '', $sql); // remove /*! */ commands
-                $sql = preg_replace('/^\s*\/\*.*?\*\//ms', '', $sql); // remove multiline comments
-                
-                // Break into individual queries by semicolon, ignoring empties
-                $queries = array_filter(array_map('trim', explode(';', $sql)));
-                
-                \Illuminate\Support\Facades\DB::transaction(function () use ($queries) {
-                    foreach ($queries as $query) {
-                        if (!empty($query)) {
-                            // Only run actual SQL commands
+                \Illuminate\Support\Facades\DB::transaction(function () use ($lines, &$query) {
+                    foreach ($lines as $line) {
+                        $trimmed = trim($line);
+                        // Skip empty lines and comments
+                        if (empty($trimmed) || str_starts_with($trimmed, '--') || str_starts_with($trimmed, '/*')) {
+                            continue;
+                        }
+                        
+                        $query .= $line . "\n";
+                        
+                        // If the line ends with a semicolon, execute it
+                        if (str_ends_with($trimmed, ';')) {
                             \Illuminate\Support\Facades\DB::statement($query);
+                            $query = ''; // Reset for the next statement
                         }
                     }
                 });
