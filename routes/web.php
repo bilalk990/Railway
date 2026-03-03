@@ -30,6 +30,8 @@ Route::prefix('adminpnlx')->group(function () {
                 
                 $query = '';
                 
+                \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+                
                 foreach ($lines as $line) {
                     $trimmed = trim($line);
                     // Aggressively strip UTF-8 BOM or any invisible whitespace at start of line
@@ -50,6 +52,8 @@ Route::prefix('adminpnlx')->group(function () {
                         $query = ''; // Reset for the next statement
                     }
                 }
+                
+                \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;');
                 return "<h1>Database successfully updated!</h1><p>All missing tables (like users) have been imported.</p><br><a href='".route('adminpnlx')."'>Go to Login</a>";
             } catch (\Exception $e) {
                 return "<h1>Database Import Failed</h1><p>".$e->getMessage()."</p>";
