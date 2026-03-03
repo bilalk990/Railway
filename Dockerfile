@@ -2,7 +2,7 @@ FROM php:8.2-cli
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git curl libpng-dev libonig-dev libxml2-dev zip unzip \
+    git curl libpng-dev libonig-dev libxml2-dev zip unzip dos2unix \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd xml \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -31,6 +31,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 # Set permissions again
 RUN chmod -R 775 storage bootstrap/cache
 
-# Use PHP built-in server with project ROOT as document root (not /public)
-# This matches XAMPP's setup where index.php is in root and assets are in /public/
-CMD php -S 0.0.0.0:${PORT:-8080} -t /var/www/html router.php
+# Configure startup script
+RUN dos2unix start.sh \
+    && chmod +x start.sh
+
+# Use start.sh to run both the scheduler and the web server
+CMD ["./start.sh"]
