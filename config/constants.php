@@ -1,5 +1,5 @@
 <?php
-$WEBSITE_URL				=	env("APP_URL");
+$WEBSITE_URL				=	url('/').'/';
 $NODE_WEB_URL 				= env('NODE_APP_URL');
 return [
 	'ALLOWED_TAGS_XSS'   	=> '<iframe><a><strong><b><p><br><i><font><img><h1><h2><h3><h4><h5><h6><span><div><em><table><ul><li><section><thead><tbody><tr><td><figure><article>',
@@ -12,7 +12,7 @@ return [
 	"IMAGE_PATH"							=>	$WEBSITE_URL.'img/',
 	"IMAGE_ROOT_PATH"						=>	"img/",
 
-	"LANGUAGE_IMAGE_PATH"					=>	$WEBSITE_URL.'/public/uploads/language_image/',
+	"LANGUAGE_IMAGE_PATH"					=>	$WEBSITE_URL.'public/uploads/language_image/',
 	"LANGUAGE_IMAGE_ROOT_PATH"				=>	"public/uploads/language_image/",
 
 	'STATE' => [
