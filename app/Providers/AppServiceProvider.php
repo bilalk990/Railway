@@ -30,8 +30,11 @@ class AppServiceProvider extends ServiceProvider
         Paginator::useBootstrap();
 
         // Force HTTPS in production (Railway uses HTTPS)
-        if (config('app.env') === 'production' || isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
-            URL::forceScheme('https');
+        // Check if NOT running in console to avoid breaking `php artisan` commands during deployment
+        if (!$this->app->runningInConsole()) {
+            if (config('app.env') === 'production' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
+                URL::forceScheme('https');
+            }
         }
 
         try {
