@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use App\Models\Setting;
 use View;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,6 +28,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         Paginator::useBootstrap();
+
+        // Force HTTPS in production (Railway uses HTTPS)
+        if (config('app.env') === 'production' || isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            URL::forceScheme('https');
+        }
 
         try {
             $youtube   = Setting::where('key','Social.youtube')->first();
