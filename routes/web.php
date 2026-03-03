@@ -166,3 +166,10 @@ Route::controller(FaqController::class)->group(function () {
 
 Route::get('/base/uploder', [App\Http\Controllers\Controller::class, 'saveCkeditorImages']);
 Route::post('/base/uploder', [App\Http\Controllers\Controller::class, 'saveCkeditorImages']);
+
+// Fallback route for static assets requested with /public/ prefix.
+// Railway's Nixpacks sets the document root to /public, which causes 404s for URLs like /public/css/...
+// This cleanly redirects those requests to the correct native static asset path, preserving local development on XAMPP.
+Route::get('public/{path}', function ($path) {
+    return redirect($path, 301);
+})->where('path', '.*');
