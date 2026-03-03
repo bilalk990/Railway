@@ -22,12 +22,23 @@ Route::prefix('adminpnlx')->group(function () {
             try {
                 $sql = file_get_contents($sqlPath);
                 
-                // Remove SQL comments to prevent PDO syntax errors
-                $sql = preg_replace('/^--.*$/m', '', $sql);
-                $sql = preg_replace('/^\/\*!.*?\*\/;$/m', '', $sql);
-                $sql = preg_replace('/^\s*$/m', '', $sql);
+                // Advanced cleanup and parsing to avoid PDO choking
+                $sql = preg_replace('/^\s*--.*$/m', '', $sql); // remove -- comments
+                $sql = preg_replace('/^\s*\/\*!.*?\*\/;$/m', '', $sql); // remove /*! */ commands
+                $sql = preg_replace('/^\s*\/\*.*?\*\//ms', '', $sql); // remove multiline comments
                 
-                \Illuminate\Support\Facades\DB::unprepared($sql);
+                // Break into individual queries by semicolon, ignoring empties
+                $queries = array_filter(array_map('trim', explode(';', $sql)));
+                
+                \Illuminate\Support\Facades\DB::transaction(function () use ($queries) {
+                    foreach ($queries as $query) {
+                        if (!empty($query)) {
+                            // Only run actual SQL commands
+                            \Illuminate\Support\Facades\DB::statement($query);
+                        }
+                    }
+                });
+                
                 return "<h1>Database successfully updated!</h1><p>All missing tables (like users) have been imported.</p><br><a href='".route('adminpnlx')."'>Go to Login</a>";
             } catch (\Exception $e) {
                 return "<h1>Database Import Failed</h1><p>".$e->getMessage()."</p>";
