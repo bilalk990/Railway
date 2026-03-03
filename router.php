@@ -10,8 +10,7 @@ $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 // If the file exists on disk, serve it directly (CSS, JS, images, etc.)
 $filePath = __DIR__ . $uri;
 if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
-    // Set correct content type for known extensions
-    $ext = pathinfo($filePath, PATHINFO_EXTENSION);
+    $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
     $mimeTypes = [
         'css'  => 'text/css',
         'js'   => 'application/javascript',
@@ -27,6 +26,7 @@ if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
         'ttf'  => 'font/ttf',
         'eot'  => 'application/vnd.ms-fontobject',
         'map'  => 'application/json',
+        'webp' => 'image/webp',
     ];
     
     if (isset($mimeTypes[$ext])) {
@@ -35,6 +35,11 @@ if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
     
     readfile($filePath);
     return true;
+}
+
+// Force HTTPS detection behind Railway's proxy
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
 }
 
 // Otherwise, route through Laravel
