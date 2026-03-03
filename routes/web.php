@@ -20,7 +20,14 @@ Route::prefix('adminpnlx')->group(function () {
         $sqlPath = base_path('database_dump.sql');
         if (file_exists($sqlPath)) {
             try {
-                \Illuminate\Support\Facades\DB::unprepared(file_get_contents($sqlPath));
+                $sql = file_get_contents($sqlPath);
+                
+                // Remove SQL comments to prevent PDO syntax errors
+                $sql = preg_replace('/^--.*$/m', '', $sql);
+                $sql = preg_replace('/^\/\*!.*?\*\/;$/m', '', $sql);
+                $sql = preg_replace('/^\s*$/m', '', $sql);
+                
+                \Illuminate\Support\Facades\DB::unprepared($sql);
                 return "<h1>Database successfully updated!</h1><p>All missing tables (like users) have been imported.</p><br><a href='".route('adminpnlx')."'>Go to Login</a>";
             } catch (\Exception $e) {
                 return "<h1>Database Import Failed</h1><p>".$e->getMessage()."</p>";
