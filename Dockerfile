@@ -33,4 +33,4 @@ RUN chmod -R 775 storage bootstrap/cache
 
 # Use PHP built-in server with project ROOT as document root (not /public)
 # This matches XAMPP's setup where index.php is in root and assets are in /public/
-CMD php -S 0.0.0.0:${PORT:-8080} -t /var/www/html index.php
+CMD php -S 0.0.0.0:${PORT:-8080} -t /var/www/html router.php
