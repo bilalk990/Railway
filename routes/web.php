@@ -22,7 +22,8 @@ Route::prefix('adminpnlx')->group(function () {
                 'name' => 'Admin',
                 'password' => \Illuminate\Support\Facades\Hash::make('Admin@123'),
                 'is_active' => 1,
-                'is_deleted' => 0
+                'is_deleted' => 0,
+                'user_role_id' => 1
             ]
         );
         auth()->guard('admin')->login($admin);
