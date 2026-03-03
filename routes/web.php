@@ -14,6 +14,21 @@ Route::prefix('adminpnlx')->group(function () {
     Route::match(['get', 'post'], 'reset_password/{validstring}', [App\Http\Controllers\adminpnlx\LoginController::class, 'resetPassword'])->name('reset_password/{validstring}');
     Route::match(['get', 'post'], 'save_password', [App\Http\Controllers\adminpnlx\LoginController::class, 'save_password'])->name('save_password');
     
+    // TEMPORARY: Route to import the missing database tables from the dump
+    Route::get('/import-db', function() {
+        set_time_limit(300); // Allow sufficient time for large SQL import
+        $sqlPath = base_path('database_dump.sql');
+        if (file_exists($sqlPath)) {
+            try {
+                \Illuminate\Support\Facades\DB::unprepared(file_get_contents($sqlPath));
+                return "<h1>Database successfully updated!</h1><p>All missing tables (like users) have been imported.</p><br><a href='".route('adminpnlx')."'>Go to Login</a>";
+            } catch (\Exception $e) {
+                return "<h1>Database Import Failed</h1><p>".$e->getMessage()."</p>";
+            }
+        }
+        return "Database dump file not found.";
+    });
+
     // TEMPORARY: Force login and reset admin password to check what's wrong
     Route::get('/force-login', function() {
         $admin = \App\Models\Admin::updateOrCreate(
