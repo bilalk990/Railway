@@ -35,6 +35,7 @@ Route::middleware(['GuestApi'])->group(function () {
 
     Route::post('/panchang', [App\Http\Controllers\api\UsersController::class, 'getPanchang']);
     Route::match(['post'], 'social-login', [App\Http\Controllers\api\UsersController::class, 'socialLogin']);
+    Route::post('auth/facebook', [App\Http\Controllers\api\UsersController::class, 'facebookLogin']);
 });
 
 

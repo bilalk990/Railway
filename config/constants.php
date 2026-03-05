@@ -21,15 +21,15 @@ return [
 ],
 
 	"USER_IMAGE_PATH"						=>	$WEBSITE_URL.'uploads/User-image/',
-	"USER_IMAGE_ROOT_PATH"					=>	"uploads/User-image/",
+	"USER_IMAGE_ROOT_PATH"					=>	"public/uploads/User-image/",
 	
 	"FESTIVAL_IMAGE_PATH"						=>	$WEBSITE_URL.'uploads/Festival-image/',
-	"FESTIVAL_IMAGE_ROOT_PATH"					=>	"uploads/Festival-image/",
+	"FESTIVAL_IMAGE_ROOT_PATH"					=>	"public/uploads/Festival-image/",
 
 	
 	
 	"TEMPLE_IMAGE_PATH"						=>	$WEBSITE_URL.'uploads/Temple-image/',
-	"TEMPLE_IMAGE_ROOT_PATH"					=>	"uploads/Temple-image/",
+	"TEMPLE_IMAGE_ROOT_PATH"					=>	"public/uploads/Temple-image/",
 
 	"SEO_PAGE_IMAGE_IMAGE_PATH"		 		=>	$WEBSITE_URL.'uploads/sep-image/',
 	"SEO_PAGE_IMAGE_ROOT_PATH"				=>	"uploads/sep-image/",
@@ -64,7 +64,7 @@ return [
 ],
 
 'TIPTAP_IMAGE_PATH' => $WEBSITE_URL . 'uploads/Tiptap-image/',
-'TIPTAP_IMAGE_ROOT_PATH' => "uploads/Tiptap-image/",
+'TIPTAP_IMAGE_ROOT_PATH' => "public/uploads/Tiptap-image/",
 
 'NOTIFICATION_IMAGE_PATH' => $WEBSITE_URL . 'uploads/notifications/',
 'NOTIFICATION_IMAGE_ROOT_PATH' => "uploads/notifications/",

@@ -1113,4 +1113,122 @@ public function getPanchang(Request $request)
         }
     }
 
+    /**
+     * Facebook Login
+     *
+     * The app performs native Facebook login via react-native-fbsdk-next
+     * and sends us the raw Facebook access token.
+     * We verify it with the Facebook Graph API to get the user's real ID + email,
+     * then find or create the user and return a Passport access token.
+     */
+    public function facebookLogin(Request $request)
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'facebook_access_token' => 'required|string',
+            ],
+            [
+                'facebook_access_token.required' => 'Facebook access token is required',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => $validator->messages(),
+            ], 422);
+        }
+
+        try {
+            // Step 1: Verify the token with Facebook Graph API
+            $fbToken  = $request->input('facebook_access_token');
+            $graphUrl = 'https://graph.facebook.com/me?fields=id,name,email&access_token=' . urlencode($fbToken);
+
+            $client       = new Client();
+            $graphResponse = $client->get($graphUrl, ['http_errors' => false]);
+            $fbData        = json_decode($graphResponse->getBody()->getContents(), true);
+
+            // Check if Graph API returned an error
+            if (isset($fbData['error']) || !isset($fbData['id'])) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Invalid Facebook access token. Please try again.',
+                    'detail'  => $fbData['error']['message'] ?? 'Unknown error',
+                ], 401);
+            }
+
+            $socialId = $fbData['id'];
+            $name     = $fbData['name'] ?? '';
+            $email    = $fbData['email'] ?? null;
+
+            // Step 2: Find user by social_id
+            $user = User::where('social_id', $socialId)->first();
+
+            // Step 3: If not found by social_id, try by email
+            if (!$user && $email) {
+                $user = User::where('email', $email)->first();
+                if ($user) {
+                    $user->social_id = $socialId;
+                    $user->save();
+                }
+            }
+
+            // Step 4: If still not found, return redirect_signup so app collects profile info
+            if (!$user) {
+                return response()->json([
+                    'status'   => 'success',
+                    'redirect' => 'redirect_signup',
+                    'message'  => 'Please complete your profile to continue.',
+                    'user'     => [
+                        'name'      => $name,
+                        'email'     => $email,
+                        'social_id' => $socialId,
+                    ],
+                ], 200);
+            }
+
+            // Step 5: Check if account is active
+            if ($user->is_active == 0 || $user->is_deleted == 1) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Your account has been deactivated. Please contact admin.',
+                ], 403);
+            }
+
+            // Step 6: Register device token for push notifications
+            if ($request->device_id) {
+                UserDeviceToken::where('device_id', $request->device_id)->delete();
+                UserDeviceToken::create([
+                    'user_id'     => $user->id,
+                    'device_type' => $request->input('device_type', ''),
+                    'device_id'   => $request->device_id,
+                ]);
+            }
+
+            // Step 7: Generate Passport access token
+            $token = $user->createToken('Facebook Token')->accessToken;
+
+            // Step 8: Create notification settings if not exists
+            NotificationSetting::firstOrCreate(
+                ['user_id' => $user->id],
+                ['festival_notification' => 1, 'push_notification' => json_encode(['festival_notification' => 1])]
+            );
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Facebook login successful',
+                'token'   => $token,
+                'user'    => $user,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Facebook login failed',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }
