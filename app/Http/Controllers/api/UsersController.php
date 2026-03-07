@@ -724,6 +724,7 @@ public function getPanchang(Request $request)
     
     public function createReminder(Request $request)
     {
+        \Log::info('createReminder: request received', $request->all());
         $request->validate([
             'festival_id'   => 'required|integer',
             'festival_date' => 'required|string',           // can be single or CSV
@@ -772,12 +773,14 @@ public function getPanchang(Request $request)
             }
     
             return response()->json([
+                'status'  => 'success',
                 'message' => 'Recurring reminders created successfully.',
                 'data'    => $createdReminders,
             ], 201);
         }
     
         // === Non-recurring (Normal Single Reminder) ===
+        \Log::info('createReminder: single reminder flow');
     
         $festivalDate = Carbon::parse($request->festival_date);
         $reminderDate = $festivalDate->copy()->subDays($request->before_days);
@@ -792,7 +795,9 @@ public function getPanchang(Request $request)
             'is_recurring' => 0,
         ]);
     
+        \Log::info('createReminder: success', ['id' => $reminder->id]);
         return response()->json([
+            'status'  => 'success',
             'message' => 'Reminder created successfully.',
             'data'    => $reminder,
         ], 201);
