@@ -103,13 +103,13 @@ class TempleController extends Controller
                 array(
                     'name'              => $dafaultLanguageArray['name'],
                     'url'               => "required",
-                    'image'             => 'required',
+                    'image'             => 'required|mimes:jpeg,png,jpg,gif|max:10240',
                     
                 ),
                 array(
                     'name'             => 'required',
                       'url'               => "required",
-                    'image'             => 'required',
+                    'image'             => 'required|mimes:jpeg,png,jpg,gif|max:10240',
                 )
             );
             

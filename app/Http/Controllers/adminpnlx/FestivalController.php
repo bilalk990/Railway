@@ -264,7 +264,7 @@ class FestivalController extends Controller
                 ],
                 [
                     'name'  => 'required',
-                    'image' => 'required|mimes:jpeg,png,jpg,gif|max:2048',
+                    'image' => 'required|mimes:jpeg,png,jpg,gif|max:10240',
                 ]
             );
     

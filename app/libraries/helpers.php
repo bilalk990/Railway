@@ -218,27 +218,29 @@ if(!function_exists('DesignationbyName'))
 }
 
   function functionCheckPermission($function_name = ""){
-    if( Auth::guard('admin')->user()->id != 1){
-     
+    static $permissionsCache = [];
     
-    $user_id				  =	Auth::guard('admin')->user()->id;
-
-    $permissionData			=	DB::table("user_permission_actions")
-                              ->select("user_permission_actions.is_active")
-                              ->leftJoin("acl_admin_actions","acl_admin_actions.id","=","user_permission_actions.admin_module_action_id")
-                              ->where('user_permission_actions.user_id',$user_id)
-                              ->where('user_permission_actions.is_active',1)
-                              ->where('acl_admin_actions.function_name',$function_name)
-                              ->first();
-   
-      if(!empty($permissionData)){
-          return 1;
-        }else{
-          return 0;
-        }
-      }else {
-        return 1;
+    if( Auth::guard('admin')->user()->id != 1){
+      $user_id = Auth::guard('admin')->user()->id;
+      
+      if (isset($permissionsCache[$user_id][$function_name])) {
+          return $permissionsCache[$user_id][$function_name];
       }
+
+      $permissionData = DB::table("user_permission_actions")
+                          ->select("user_permission_actions.is_active")
+                          ->leftJoin("acl_admin_actions","acl_admin_actions.id","=","user_permission_actions.admin_module_action_id")
+                          ->where('user_permission_actions.user_id',$user_id)
+                          ->where('user_permission_actions.is_active',1)
+                          ->where('acl_admin_actions.function_name',$function_name)
+                          ->first();
+   
+      $result = !empty($permissionData) ? 1 : 0;
+      $permissionsCache[$user_id][$function_name] = $result;
+      return $result;
+    } else {
+      return 1;
+    }
 }
 
 
