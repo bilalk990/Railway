@@ -87,8 +87,9 @@ class FestivalController extends Controller
         $query_string			=	http_build_query($complete_string);
         $results->appends($inputGet)->render();
         $resultcount = $results->count();
-            $allStates = \App\Models\State::get();
-        return  View("admin.$this->model.index", compact('resultcount', 'results', 'searchVariable', 'sortBy', 'order', 'query_string','allStates'));
+        $allStates = \App\Models\State::get();
+        $statesList = $allStates->pluck('name', 'id')->toArray();
+        return  View("admin.$this->model.index", compact('resultcount', 'results', 'searchVariable', 'sortBy', 'order', 'query_string','allStates', 'statesList'));
     }
     public function create(Request $request)
     {       
@@ -252,6 +253,8 @@ class FestivalController extends Controller
             $default_language     = Config('constants.DEFAULT_LANGUAGE.FOLDER_CODE');
             $language_code        = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
             $dafaultLanguageArray = $thisData['data'][$language_code];
+            
+            \Log::info('FestivalController@Save: start', ['data' => $thisData]);
     
             // ✅ Validation
             $validator = Validator::make(
@@ -266,6 +269,7 @@ class FestivalController extends Controller
             );
     
             if ($validator->fails()) {
+                \Log::warning('FestivalController@Save: validation failed', ['errors' => $validator->errors()->toArray()]);
                 return Redirect::back()->withErrors($validator)->withInput();
             } else {
                 $festival = new Festival;
@@ -290,12 +294,21 @@ class FestivalController extends Controller
     
                 // ✅ Image upload
                 if ($request->hasFile('image')) {
-                    $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
-                    $festival->image = $uploadedFileUrl;
+                    \Log::info('FestivalController@Save: uploading image to Cloudinary');
+                    try {
+                        $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                        $festival->image = $uploadedFileUrl;
+                        \Log::info('FestivalController@Save: image uploaded', ['url' => $uploadedFileUrl]);
+                    } catch (\Exception $e) {
+                        \Log::error('FestivalController@Save: Cloudinary upload failed', ['error' => $e->getMessage()]);
+                        Session()->flash('error', trans("Cloudinary upload failed: " . $e->getMessage()));
+                        return Redirect()->back()->withInput();
+                    }
                 }
     
                 // ✅ Save festival
                 $SavedResponse = $festival->save();
+                \Log::info('FestivalController@Save: festival saved', ['success' => $SavedResponse, 'id' => $festival->id]);
                 $lastId = $festival->id;
     
                 // ✅ Save multilingual descriptions

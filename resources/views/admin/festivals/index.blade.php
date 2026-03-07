@@ -159,15 +159,14 @@ $statusPermission   = functionCheckPermission("UsersController@changeStatus");
                     @php
                         $stateNames = [];
                         foreach($result->states as $stateId) {
-                            $state = \App\Models\State::find($stateId);
-                            if($state) {
-                                $stateNames[] = $state->name;
+                            if(isset($statesList[$stateId])) {
+                                $stateNames[] = $statesList[$stateId];
                             }
                         }
                         $displayStates = implode(', ', array_slice($stateNames, 0, 3));
-                        $allStates = implode(', ', $stateNames);
+                        $allStatesString = implode(', ', $stateNames);
                     @endphp
-                    <span data-toggle="tooltip" data-placement="top" title="{{ $allStates }}">
+                    <span data-toggle="tooltip" data-placement="top" title="{{ $allStatesString }}">
                         {{ $displayStates }}
                         @if(count($stateNames) > 3)
                             +{{ count($stateNames) - 3 }} more

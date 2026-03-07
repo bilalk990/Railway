@@ -92,9 +92,10 @@ class TempleController extends Controller
     public function Save(Request $request){
         if ($request->isMethod('POST')) {
             $thisData = $request->all();
-            $default_language           =    Config('constants.DEFAULT_LANGUAGE.FOLDER_CODE');
             $language_code              =    Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
             $dafaultLanguageArray       =    $thisData['data'][$language_code];
+            
+            \Log::info('TempleController@Save: start', ['data' => $thisData]);
         
             
             $validator                    =   Validator::make(
@@ -113,14 +114,23 @@ class TempleController extends Controller
             );
             
             if ($validator->fails()) {
+                \Log::warning('TempleController@Save: validation failed', ['errors' => $validator->errors()->toArray()]);
                 return Redirect::back()->withErrors($validator)->withInput();
             }else{
                 $temple                               =   new Temple;
                 $temple->url                          =   $request->input('url');
                 $temple->name                         =   $dafaultLanguageArray['name'] ?? '';
                 if ($request->hasFile('image')) {
-                    $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
-                    $temple->image = $uploadedFileUrl;
+                    \Log::info('TempleController@Save: uploading image to Cloudinary');
+                    try {
+                        $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                        $temple->image = $uploadedFileUrl;
+                        \Log::info('TempleController@Save: image uploaded', ['url' => $uploadedFileUrl]);
+                    } catch (\Exception $e) {
+                        \Log::error('TempleController@Save: Cloudinary upload failed', ['error' => $e->getMessage()]);
+                        Session()->flash('error', trans("Cloudinary upload failed: " . $e->getMessage()));
+                        return Redirect()->back()->withInput();
+                    }
                 }
                 $SavedResponse = $temple->save();
                 $lastId = $temple->id;
