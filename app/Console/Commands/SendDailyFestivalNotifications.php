@@ -132,11 +132,12 @@ class SendDailyFestivalNotifications extends Command
                 
                 // Send push notification using existing controller method
                 foreach ($deviceTokens as $deviceToken) {
+                    \Log::info('Festival notification: sending to token', ['token' => $deviceToken->device_id]);
                     // Use existing send_push_notification method from Controller
                     $controller = new Controller();
                     $controller->send_push_notification(
-                        $deviceToken->device_token,
-                        '', // device_type parameter (if needed, can be extracted from device_token table)
+                        $deviceToken->device_id,
+                        '', // device_type parameter
                         $message['body'],
                         $message['title'],
                         'festival',
@@ -216,10 +217,11 @@ class SendDailyFestivalNotifications extends Command
             
             // Send push notification using existing controller method
             foreach ($deviceTokens as $deviceToken) {
+                \Log::info('Reminder notification: sending to token', ['token' => $deviceToken->device_id]);
                 // Use existing send_push_notification method from Controller
                 $controller = new Controller();
                 $controller->send_push_notification(
-                    $deviceToken->device_token,
+                    $deviceToken->device_id,
                     '', // device_type parameter
                     $message['body'],
                     $message['title'],
@@ -327,12 +329,14 @@ class SendDailyFestivalNotifications extends Command
     /**
      * Get user's device tokens
      */
-    private function getUserDeviceTokens($userId)
+    protected function getUserDeviceTokens($userId)
     {
-        return UserDeviceToken::where('user_id', $userId)
-                             ->whereNotNull('device_token')
-                             ->where('device_token', '!=', '')
+        $tokens = UserDeviceToken::where('user_id', $userId)
+                             ->whereNotNull('device_id')
+                             ->where('device_id', '!=', '')
                              ->get();
+        \Log::info('getUserDeviceTokens: found tokens', ['count' => $tokens->count(), 'user_id' => $userId]);
+        return $tokens;
     }
     
     /**
