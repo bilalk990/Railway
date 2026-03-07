@@ -1,7 +1,9 @@
 #!/bin/bash
 # Startup script to run the scheduler in the background and the web server in the foreground
-# Generate passport keys and run migrations
-php artisan passport:keys --force || true
+# Generate passport keys if they don't exist
+if [ ! -f storage/oauth-private.key ]; then
+    php artisan passport:keys --force || true
+fi
 php artisan migrate --force || true
 
 # Start the Laravel schedule:run command in an infinite loop in the background
