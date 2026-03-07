@@ -25,4 +25,4 @@ echo "Starting Laravel scheduler in the background..."
 
 # Start the PHP built-in web server in the foreground
 echo "Starting PHP built-in server on port ${PORT:-8080}..."
-php -S 0.0.0.0:${PORT:-8080} -t /var/www/html router.php
+php -d upload_max_filesize=128M -d post_max_size=128M -d memory_limit=512M -S 0.0.0.0:${PORT:-8080} -t /var/www/html router.php

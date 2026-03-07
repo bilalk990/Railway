@@ -87,7 +87,9 @@ class FestivalController extends Controller
     {
         $languages = Language::where('is_active', 1)->get();
         $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-        return View("admin.$this->model.add", compact('languages', 'language_code'));
+        $states = State::where('is_active', 1)->get();
+        $temples = Temple::where('is_active', 1)->where('is_deleted', 0)->get();
+        return View("admin.$this->model.add", compact('languages', 'language_code', 'states', 'temples'));
     }
 
     public function Save(Request $request)
