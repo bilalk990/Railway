@@ -6,40 +6,43 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\App;
-use Config;
-use App\Models\Festival;  
-use App\Models\Temple;  
+use App\Models\Festival;
+use App\Models\FestivalDescription;
+use App\Models\Temple;
 use App\Models\FestivalTemple;
 use App\Models\Language;
-use App\Models\FestivalDescription;
-use Carbon\Carbon;
-use Redirect,Session;
+use App\Models\Faq;
+use App\Models\FestivalFaq;
+use App\Models\State;
+use App\Models\Reminder;
+use Redirect, Session, Auth, Config;
 
 class FestivalController extends Controller
 {
-    public $model      =   'festivals';
-    public $sectionNameSingular      =   'festivals';
-    public function __construct(Request $request)
-    {   
-        parent::__construct();
-        View()->share('model', $this->model);
-        View()->share('sectionNameSingular', $this->sectionNameSingular);
-        $this->request = $request;
+    public $model = 'festivals';
+
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $this->user = Auth::guard('admin')->user();
+            return $next($request);
+        });
     }
+
     public function index(Request $request)
     {
-        $DB					=	Festival::query();
-        $searchVariable		=	array();
-        $inputGet			=	$request->all();
+        $DB = Festival::query();
+        $DB->where('is_deleted', 0);
+
+        $searchVariable = array();
+        $inputGet = $request->all();
+
         if ($request->all()) {
-            $searchData			=	$request->all();
+            $searchData = $request->all();
             unset($searchData['display']);
             unset($searchData['_token']);
-
             if (isset($searchData['order'])) {
                 unset($searchData['order']);
             }
@@ -49,225 +52,63 @@ class FestivalController extends Controller
             if (isset($searchData['page'])) {
                 unset($searchData['page']);
             }
-            
- if (!empty($searchData['state_id'])) {
-            $stateId = $searchData['state_id'];
-            $DB->whereJsonContains('states', $stateId);
-        }
-            if ((!empty($searchData['date_from'])) && (!empty($searchData['date_to']))) {
-                $dateS = date("Y-m-d",strtotime($searchData['date_from']));
-                $dateE =  date("Y-m-d",strtotime($searchData['date_to']));
-                $DB->whereBetween('festivals.created_at', [$dateS . " 00:00:00", $dateE . " 23:59:59"]);
-            } elseif (!empty($searchData['date_from'])) {
-                $dateS = $searchData['date_from'];
-                $DB->where('festivals.created_at', '>=', [$dateS . " 00:00:00"]);
-            } elseif (!empty($searchData['date_to'])) {
-                $dateE = $searchData['date_to'];
-                $DB->where('festivals.created_at', '<=', [$dateE . " 00:00:00"]);
-            }
+
             foreach ($searchData as $fieldName => $fieldValue) {
                 if ($fieldValue != "") {
                     if ($fieldName == "name") {
-                        $DB->where("temples.name", 'like', '%' . $fieldValue . '%');
+                        $DB->where("name", 'like', '%' . $fieldValue . '%');
                     }
-                    
+                    if ($fieldName == "is_active") {
+                        $DB->where("is_active", $fieldValue);
+                    }
                 }
-                $searchVariable	=	array_merge($searchVariable, array($fieldName => $fieldValue));
+                $searchVariable = array_merge($searchVariable, array($fieldName => $fieldValue));
             }
         }
 
-        $DB->where("festivals.is_deleted", 0);
-        $sortBy = ($request->input('sortBy')) ? $request->input('sortBy') : 'festivals.created_at';
-        $order  = ($request->input('order')) ? $request->input('order')   : 'DESC';
-        $records_per_page	=	($request->input('per_page')) ? $request->input('per_page') : Config::get("Reading.records_per_page");
+        $sortBy = ($request->input('sortBy')) ? $request->input('sortBy') : 'id';
+        $order = ($request->input('order')) ? $request->input('order') : 'DESC';
+
+        $records_per_page = (Config::get('Reading.record_per_page')) ? Config::get('Reading.record_per_page') : 10;
         $results = $DB->orderBy($sortBy, $order)->paginate($records_per_page);
-        $complete_string		=	$request->query();
+
+        $complete_string = $request->query();
         unset($complete_string["sortBy"]);
         unset($complete_string["order"]);
-        $query_string			=	http_build_query($complete_string);
-        $results->appends($inputGet)->render();
-        $resultcount = $results->count();
-        $allStates = \App\Models\State::get();
-        $statesList = $allStates->pluck('name', 'id')->toArray();
-        return  View("admin.$this->model.index", compact('resultcount', 'results', 'searchVariable', 'sortBy', 'order', 'query_string','allStates', 'statesList'));
+        $query_string = http_build_query($complete_string);
+        $results->appends($inputGet);
+
+        return View("admin.$this->model.index", compact('results', 'searchVariable', 'sortBy', 'order', 'query_string'));
     }
-    public function create(Request $request)
-    {       
-        $temples    = Temple::where('is_deleted',0)->get();
-        $states     = \App\Models\State::get();
+
+    public function create()
+    {
         $languages = Language::where('is_active', 1)->get();
         $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-        return View("admin.$this->model.add", compact('temples','states','languages', 'language_code'));
-        
+        return View("admin.$this->model.add", compact('languages', 'language_code'));
     }
 
-
-    public function markPopular(Request $request)
-{
-    try {
-        // Validate request
-        $validator = Validator::make($request->all(), [
-            'festival_id' => 'required|exists:festivals,id',
-            'is_popular' => 'required|in:0,1'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid request data'
-            ], 422);
-        }
-        $festival = Festival::find($request->festival_id);
-
-        if (!$festival) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Festival not found'
-            ], 404);
-        }
-
-        // Check if user has permission (optional)
-        // if (!auth()->user()->can('update-festival')) {
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => 'You do not have permission to update this festival'
-        //     ], 403);
-        // }
-
-        // Update festival status
-        $oldStatus = $festival->is_popular;
-        $festival->is_popular = $request->is_popular;
-        $saved = $festival->save();
-
-        if ($saved) {
-            // Optional: Log the activity
-            // activity()
-            //     ->performedOn($festival)
-            //     ->causedBy(auth()->user())
-            //     ->log('marked festival as ' . ($request->is_popular ? 'popular' : 'not popular'));
-            
-            return response()->json([
-                'success' => true,
-                'message' => $request->is_popular 
-                    ? 'Festival has been marked as popular' 
-                    : 'Festival has been marked as not popular',
-                'data' => [
-                    'is_popular' => $festival->is_popular,
-                    'status_text' => $festival->is_popular ? 'Popular' : 'Not Popular'
-                ]
-            ]);
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update festival status. Please try again.'
-            ], 500);
-        }
-
-    } catch (\Exception $e) {
-        \Log::error('Error marking festival as popular: ' . $e->getMessage());
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'An error occurred while updating the festival status'
-        ], 500);
-    }
-}
-    
-    
-    // public function Save(Request $request){
-    //     if ($request->isMethod('POST')) {
-    //         $thisData = $request->all();
-    //         $default_language           =    Config('constants.DEFAULT_LANGUAGE.FOLDER_CODE');
-    //         $language_code              =    Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-    //         $dafaultLanguageArray       =    $thisData['data'][$language_code];
-           
-            
-    //         $validator                    =   Validator::make(
-                
-    //             array(
-    //                 'name'              => $dafaultLanguageArray['name'],
-    //                 'image'             => 'required',
-                    
-    //             ),
-    //             array(
-    //                 'name'             => 'required',
-    //             )
-    //         );
-            
-    //         if ($validator->fails()) {
-    //             return Redirect::back()->withErrors($validator)->withInput();
-    //         }else{
-    //             $festival                               =   new Festival;
-    //             $festival->date                         =   $request->input('date');
-    //             $festival->name                         =   $dafaultLanguageArray['name'] ?? '';
-    //             $festival->description                  =   $dafaultLanguageArray['long_dec'] ?? '';
-    //             $festival->temple_id                    =   $request->input('temple_id');
-    //             $festival->short_dec                    =   $dafaultLanguageArray['short_dec'] ?? '';
-    //             $festival->long_dec                     =   $dafaultLanguageArray['long_dec'] ?? '';
-    //             $festival->regional_names                     =   $dafaultLanguageArray['regional_names'] ?? '';
-                
-    //             if ($request->hasFile('image')) {
-    //                 $extension = $request->file('image')->getClientOriginalExtension();
-    //                 $fileName = time() . '-image.' . $extension;
-    //                 $folderName = strtoupper(date('M') . date('Y')) . "/";
-    //                 $folderPath = Config('constants.FESTIVAL_IMAGE_ROOT_PATH') . $folderName;
-                    
-    //                 if ($request->file('image')->move($folderPath, $fileName)) {
-    //                     $festival->image = $folderName . $fileName;
-    //                 }
-    //             }
-    //             $SavedResponse = $festival->save();
-    //             $lastId = $festival->id;
-    //             if (!empty($thisData)) {
-    //                 foreach ($thisData['data'] as $language_id => $value) {
-    //                     $subObj                 = new FestivalDescription();
-    //                     $subObj->language_id    = $language_id;
-    //                     $subObj->parent_id      = $lastId;
-    //                     $subObj->name           = $value['name'];
-    //                     $subObj->description    = $value['short_dec'] ?? '';
-    //                     $subObj->long_description = $value['long_dec'] ?? '';
-    //                     $subObj->regional_names = $value['regional_names'] ?? '';
-    //                     $subObj->save();
-    //                 }
-    //             }
-
-                
-    //             if (!$SavedResponse) {
-    //                 Session()->flash('error', trans("Something went wrong."));
-    //                 return Redirect()->back()->withInput();
-    //             } else {
-    //                 Session()->flash('success', ucfirst(Config('constants.FESTIVAL.FESTIVAL_TITLE')." has been added successfully"));
-    //                 return Redirect()->route($this->model . ".index");
-    //             }
-    //         }
-    //     } 
-    // }
-    
-    
-    
-    
-    public function Save(Request $request){
+    public function Save(Request $request)
+    {
         if ($request->isMethod('POST')) {
             $thisData = $request->all();
-    
-            $default_language     = Config('constants.DEFAULT_LANGUAGE.FOLDER_CODE');
-            $language_code        = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
+
+            $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
             $dafaultLanguageArray = $thisData['data'][$language_code];
-            
-            // ✅ Detailed File Logging (helps debug specific file failures)
+
+            // ✅ Detailed File Logging
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
                 \Log::info('FestivalController@Save: received image', [
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
-                    'size' => $file->getSize(), // bytes
+                    'size' => $file->getSize(),
                     'extension' => $file->getClientOriginalExtension(),
                 ]);
             } else {
-                \Log::info('FestivalController@Save: no image in request');
+                \Log::info('FestivalController@Save: no image');
             }
 
-            // ✅ Validation (Increased max to 20MB and added mimetypes)
             $validator = Validator::make(
                 [
                     'name'  => $dafaultLanguageArray['name'] ?? '',
@@ -278,71 +119,59 @@ class FestivalController extends Controller
                     'image' => 'nullable|mimes:jpeg,png,jpg,gif,webp|mimetypes:image/jpeg,image/png,image/jpg,image/gif,image/webp|max:20480',
                 ]
             );
-    
+
             if ($validator->fails()) {
                 \Log::warning('FestivalController@Save: validation failed', ['errors' => $validator->errors()->toArray()]);
                 return Redirect::back()->withErrors($validator)->withInput();
             } else {
                 $festival = new Festival;
-    
-                // ✅ Base (non-language) fields
-                $festival->date             = $request->input('date');
-                $festival->name             = $dafaultLanguageArray['name'] ?? '';
-                $festival->short_dec        = $dafaultLanguageArray['short_desc'] ?? '';
-                $festival->long_dec         = $dafaultLanguageArray['long_desc'] ?? '';
-                $festival->regional_names   = $dafaultLanguageArray['regional_names'] ?? '';
-                $festival->temple_id        = $request->input('temple_id'); // if applicable
-                $festival->description      = $dafaultLanguageArray['long_desc'] ?? '';
-                  $festival->states           = $request->input('states');
-    
-                // ✅ Optional base-level columns (add these columns in DB if needed)
-                $festival->states_celebrated  = $dafaultLanguageArray['states_celebrated'] ?? '';
-                $festival->duration           = $dafaultLanguageArray['duration'] ?? '';
+                $festival->date = $request->input('date');
+                $festival->name = $dafaultLanguageArray['name'] ?? '';
+                $festival->short_dec = $dafaultLanguageArray['short_desc'] ?? '';
+                $festival->long_dec = $dafaultLanguageArray['long_desc'] ?? '';
+                $festival->regional_names = $dafaultLanguageArray['regional_names'] ?? '';
+                $festival->description = $dafaultLanguageArray['long_desc'] ?? '';
+                $festival->states = $request->input('states');
+                $festival->duration = $dafaultLanguageArray['duration'] ?? '';
                 $festival->daily_significance = $dafaultLanguageArray['daily_significance'] ?? '';
-                $festival->history            = $dafaultLanguageArray['history'] ?? '';
-                $festival->temples_to_visit   = $dafaultLanguageArray['temples_to_visit'] ?? '';
-                $festival->other_info         = $dafaultLanguageArray['other_info'] ?? '';
-    
-                // ✅ Image upload
+                $festival->history = $dafaultLanguageArray['history'] ?? '';
+                $festival->temples_to_visit = $dafaultLanguageArray['temples_to_visit'] ?? '';
+                $festival->other_info = $dafaultLanguageArray['other_info'] ?? '';
+
                 if ($request->hasFile('image')) {
-                    \Log::info('FestivalController@Save: uploading image to Cloudinary');
+                    \Log::info('FestivalController@Save: uploading to Cloudinary');
                     try {
                         $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
                         $festival->image = $uploadedFileUrl;
-                        \Log::info('FestivalController@Save: image uploaded', ['url' => $uploadedFileUrl]);
+                        \Log::info('FestivalController@Save: uploaded', ['url' => $uploadedFileUrl]);
                     } catch (\Exception $e) {
-                        \Log::error('FestivalController@Save: Cloudinary upload failed', ['error' => $e->getMessage()]);
+                        \Log::error('FestivalController@Save: failed', ['error' => $e->getMessage()]);
                         Session()->flash('error', trans("Cloudinary upload failed: " . $e->getMessage()));
                         return Redirect()->back()->withInput();
                     }
                 }
-    
-                // ✅ Save festival
+
                 $SavedResponse = $festival->save();
-                \Log::info('FestivalController@Save: festival saved', ['success' => $SavedResponse, 'id' => $festival->id]);
                 $lastId = $festival->id;
-    
-                // ✅ Save multilingual descriptions
+
                 if (!empty($thisData['data'])) {
                     foreach ($thisData['data'] as $language_id => $value) {
                         $subObj = new FestivalDescription();
-                        $subObj->language_id       = $language_id;
-                        $subObj->parent_id         = $lastId;
-                        $subObj->name              = $value['name'] ?? '';
-                        $subObj->description       = $value['short_desc'] ?? '';
-                        $subObj->long_description  = $value['long_desc'] ?? '';
-                        $subObj->regional_names    = $value['regional_names'] ?? '';
-                        $subObj->states_celebrated = $value['states_celebrated'] ?? '';
-                        $subObj->duration          = $value['duration'] ?? '';
+                        $subObj->language_id = $language_id;
+                        $subObj->parent_id = $lastId;
+                        $subObj->name = $value['name'] ?? '';
+                        $subObj->description = $value['short_desc'] ?? '';
+                        $subObj->long_description = $value['long_desc'] ?? '';
+                        $subObj->regional_names = $value['regional_names'] ?? '';
+                        $subObj->duration = $value['duration'] ?? '';
                         $subObj->daily_significance = $value['daily_significance'] ?? '';
-                        $subObj->history           = $value['history'] ?? '';
-                        $subObj->temples_to_visit  = $value['temples_to_visit'] ?? '';
-                        $subObj->other_info        = $value['other_info'] ?? '';
+                        $subObj->history = $value['history'] ?? '';
+                        $subObj->temples_to_visit = $value['temples_to_visit'] ?? '';
+                        $subObj->other_info = $value['other_info'] ?? '';
                         $subObj->save();
                     }
                 }
-    
-                // ✅ Final response
+
                 if (!$SavedResponse) {
                     Session()->flash('error', trans("Something went wrong."));
                     return Redirect()->back()->withInput();
@@ -353,310 +182,144 @@ class FestivalController extends Controller
             }
         }
     }
-    
-    
 
-    // public function edit(Request $request,  $enuserid = null)
-    // { 
-    //     $festival_id = '';
-    //     $multiLanguage =    array();
-    //     if (!empty($enuserid)) {
-    //         $festival_id = base64_decode($enuserid);
-    //         $festivalDetails         =   Festival::find($festival_id);
-    //         $cmsdescriptiondetl = FestivalDescription::where('parent_id', $festival_id)->get();
-    //         if (!empty($cmsdescriptiondetl)) {
-    //             foreach ($cmsdescriptiondetl as $description) {
-    //                 $multiLanguage[$description->language_id]['name']    =    $description->name;
-    //                 $multiLanguage[$description->language_id]['short_desc']    =    $description->description;
-    //                 $multiLanguage[$description->language_id]['long_desc']    =    $description->long_description;
-    //             }
-    //         }
-    //         $languages = Language::where('is_active', 1)->get();
-    //         $temples    = Temple::where('is_deleted',0)->get();
-    //         $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-    //         return View("admin.$this->model.edit", compact('multiLanguage', 'cmsdescriptiondetl', 'festivalDetails', 'languages', 'language_code','temples'));
-
-    //     }else{
-    //         return Redirect()->route($this->model . ".index");
-    //     }
-        
-     
-    // }
-    
-    
     public function edit(Request $request, $enuserid = null)
-{
-    $festival_id = '';
-    $multiLanguage = [];
-
-    if (!empty($enuserid)) {
-        $festival_id = base64_decode($enuserid);
-        $festivalDetails = Festival::find($festival_id);
-
-        $cmsdescriptiondetl = FestivalDescription::where('parent_id', $festival_id)->get();
-
-        if (!empty($cmsdescriptiondetl)) {
-            foreach ($cmsdescriptiondetl as $description) {
-                $multiLanguage[$description->language_id]['name']               = $description->name;
-                $multiLanguage[$description->language_id]['short_desc']         = $description->description;
-                $multiLanguage[$description->language_id]['long_desc']          = $description->long_description;
-                $multiLanguage[$description->language_id]['regional_names']     = $description->regional_names ?? '';
-                $multiLanguage[$description->language_id]['states_celebrated']  = $description->states_celebrated ?? '';
-                $multiLanguage[$description->language_id]['duration']           = $description->duration ?? '';
-                $multiLanguage[$description->language_id]['daily_significance'] = $description->daily_significance ?? '';
-                $multiLanguage[$description->language_id]['history']            = $description->history ?? '';
-                $multiLanguage[$description->language_id]['temples_to_visit']   = $description->temples_to_visit ?? '';
-                $multiLanguage[$description->language_id]['other_info']         = $description->other_info ?? '';
-            }
-        }
-
-        $languages = Language::where('is_active', 1)->get();
-        $temples = Temple::where('is_deleted', 0)->get();
-        $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-        $states = \App\Models\State::get(); // Add this
-
-        return view("admin.$this->model.edit", compact(
-            'multiLanguage',
-            'cmsdescriptiondetl',
-            'festivalDetails',
-            'languages',
-            'language_code',
-            'temples',
-            'states'
-        ));
-    } else {
-        return redirect()->route($this->model . ".index");
-    }
-}
-
-    
-    // public function update(Request $request,  $enuserid = null){
-    //     $festival_id = '';
-    //     $multiLanguage =    array();
-    //     if (!empty($enuserid)) {
-    //       $festival_id = base64_decode($enuserid);
-    //         $thisData                    =    $request->all();
-            
-    //         $default_language            =    Config('constants.DEFAULT_LANGUAGE.FOLDER_CODE');
-    //         $language_code                 =   Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-    //         $dafaultLanguageArray        =    $thisData['data'][$language_code];
-            
-    //           $validator = Validator::make(
-    //             array(
-    //               'name'              => $dafaultLanguageArray['name'],
-    //             ),
-    //             array(
-    //               'name'             => 'required',
-    //             )
-    //         );
-    //         if ($validator->fails()) {
-    //             return redirect()->back()->withErrors($validator)->withInput();
-    //         }else{
-    //              $festival                               =   Festival::where("id",$festival_id)->first();
-    //             $festival->name                         =   $dafaultLanguageArray['name'] ?? '';
-    //             $festival->date                         =   $request->date;
-    //              $festival->description                 =   $dafaultLanguageArray['long_dec'] ?? '';
-    //             if(!empty($request->temple_id)){
-    //                  $festival->temple_id   =   json_encode($request->input('temple_id'));
-    //             }
-    //              $festival->short_dec                 =   $dafaultLanguageArray['short_dec'] ?? '';
-    //              $festival->long_dec                 =   $dafaultLanguageArray['long_dec'] ?? '';
-                 
-    //             if ($request->hasFile('image')) {
-    //                 $extension = $request->file('image')->getClientOriginalExtension();
-    //                 $fileName = time() . '-image.' . $extension;
-    //                 $folderName = strtoupper(date('M') . date('Y')) . "/";
-    //                 $folderPath = Config('constants.FESTIVAL_IMAGE_ROOT_PATH') . $folderName;
-                    
-    //                 if ($request->file('image')->move($folderPath, $fileName)) {
-    //                     $festival->image = $folderName . $fileName;
-    //                 }
-    //             }
-    //             $SavedResponse = $festival->save();
-    //             $lastId = $festival->id;
-    //              FestivalDescription::where("parent_id", $lastId)->delete();
-    //             if (!empty($thisData)) {
-    //                 foreach ($thisData['data'] as $language_id => $value) {
-    //                     $subObj                =    new FestivalDescription();
-    //                     $subObj->language_id    = $language_id;
-    //                     $subObj->parent_id      = $lastId;
-    //                     $subObj->name           = $value['name'];
-    //                     $subObj->description    = $value['short_desc'] ?? '';
-    //                     $subObj->long_description = $value['long_desc'] ?? '';
-    //                     $subObj->save();
-    //                 }
-    //             }
-    //              if (!$SavedResponse) {
-    //                 Session()->flash('error', trans("Something went wrong."));
-    //                 return Redirect()->back()->withInput();
-    //             } else {
-    //                 Session()->flash('success', ucfirst(Config('constants.FESTIVAL.FESTIVAL_TITLE')." has been updated successfully"));
-    //                 return Redirect()->route($this->model . ".index");
-    //             }
-    //         }
-            
-    //     }
-       
-    // }
-    public function update(Request $request, $enuserid = null)
-{
-    if (empty($enuserid)) {
-        Session()->flash('error', trans("Invalid festival ID."));
-        return Redirect()->back();
-    }
-
-    $festival_id = base64_decode($enuserid);
-    $thisData = $request->all();
-
-    $default_language = Config('constants.DEFAULT_LANGUAGE.FOLDER_CODE');
-    $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-    $dafaultLanguageArray = $thisData['data'][$language_code];
-
-    // ✅ Detailed File Logging
-    if ($request->hasFile('image')) {
-        $file = $request->file('image');
-        \Log::info('FestivalController@update: received image', [
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'size' => $file->getSize(),
-            'extension' => $file->getClientOriginalExtension(),
-        ]);
-    }
-
-    // ✅ Validation (Increased max to 20MB and added mimetypes)
-    $validator = Validator::make(
-        [
-            'name'  => $dafaultLanguageArray['name'] ?? '',
-            'image' => $request->file('image'),
-        ],
-        [
-            'name'  => 'required',
-            'image' => 'nullable|mimes:jpeg,png,jpg,gif,webp|mimetypes:image/jpeg,image/png,image/jpg,image/gif,image/webp|max:20480',
-        ]
-    );
-
-    if ($validator->fails()) {
-        return Redirect::back()->withErrors($validator)->withInput();
-    }
-
-    // ✅ Find existing record
-    $festival = Festival::where("id", $festival_id)->first();
-    if (!$festival) {
-        Session()->flash('error', trans("Festival not found."));
-        return Redirect()->back();
-    }
-
-    // ✅ Update base (non-language) fields
-    $festival->date                = $request->input('date');
-    $festival->name                = $dafaultLanguageArray['name'] ?? '';
-    $festival->regional_names      = $dafaultLanguageArray['regional_names'] ?? '';
-    $festival->description         = $dafaultLanguageArray['long_desc'] ?? '';
-    $festival->states              = $request->input('states'); 
-    if(!empty($request->temple_id)){
-        $festival->temple_id   =   json_encode($request->input('temple_id'));
-    }
-    $festival->short_dec           =   $dafaultLanguageArray['short_desc'] ?? '';
-    $festival->long_dec            =   $dafaultLanguageArray['long_desc'] ?? '';
-    $festival->states_celebrated   = $dafaultLanguageArray['states_celebrated'] ?? '';
-    $festival->duration            = $dafaultLanguageArray['duration'] ?? '';
-    $festival->daily_significance  = $dafaultLanguageArray['daily_significance'] ?? '';
-    $festival->history             = $dafaultLanguageArray['history'] ?? '';
-    $festival->temples_to_visit    = $dafaultLanguageArray['temples_to_visit'] ?? '';
-    $festival->other_info          = $dafaultLanguageArray['other_info'] ?? '';
-
-    // ✅ Handle image upload
-    if ($request->hasFile('image')) {
-        \Log::info('FestivalController@update: uploading image to Cloudinary');
-        try {
-            $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
-            $festival->image = $uploadedFileUrl;
-            \Log::info('FestivalController@update: image uploaded', ['url' => $uploadedFileUrl]);
-        } catch (\Exception $e) {
-            \Log::error('FestivalController@update: Cloudinary upload failed', ['error' => $e->getMessage()]);
-            Session()->flash('error', trans("Cloudinary upload failed: " . $e->getMessage()));
-            return Redirect()->back()->withInput();
-        }
-    }
-
-    // ✅ Save main table
-    $SavedResponse = $festival->save();
-    $lastId = $festival->id;
-
-    // ✅ Update multilingual table
-    FestivalDescription::where("parent_id", $lastId)->delete();
-
-    if (!empty($thisData['data'])) {
-        foreach ($thisData['data'] as $language_id => $value) {
-            $subObj = new FestivalDescription();
-            $subObj->language_id        = $language_id;
-            $subObj->parent_id          = $lastId;
-            $subObj->name               = $value['name'] ?? '';
-            $subObj->description    = $value['short_desc'] ?? '';
-            $subObj->long_description = $value['long_desc'] ?? '';
-            $subObj->regional_names     = $value['regional_names'] ?? '';
-            $subObj->states_celebrated  = $value['states_celebrated'] ?? '';
-            $subObj->duration           = $value['duration'] ?? '';
-            $subObj->daily_significance = $value['daily_significance'] ?? '';
-            $subObj->history            = $value['history'] ?? '';
-            $subObj->temples_to_visit   = $value['temples_to_visit'] ?? '';
-            $subObj->other_info         = $value['other_info'] ?? '';
-            $subObj->save();
-        }
-    }
-
-    // ✅ Final response
-    if (!$SavedResponse) {
-        Session()->flash('error', trans("Something went wrong."));
-        return Redirect()->back()->withInput();
-    }
-
-    Session()->flash('success', ucfirst(Config('constants.FESTIVAL.FESTIVAL_TITLE') . " has been updated successfully"));
-    return Redirect()->route($this->model . ".index");
-}
-
-    
-    public function destroy( $enuserid)
     {
         $festival_id = '';
+        $multiLanguage = array();
         if (!empty($enuserid)) {
             $festival_id = base64_decode($enuserid);
-        }
-        $userDetails   =   Festival::find($festival_id);
-        if (empty($userDetails)) {
-            return Redirect()->route($this->model . '.index');
-        }
-        if ($festival_id) {
-
-            Festival::where('id', $festival_id)->update(array(
-                'is_deleted'    => 1, 
-            ));
-
-            Session()->flash('flash_notice', trans(ucfirst( "Festival has been removed successfully")));
-        }
-        return back();
-    }
-    public function changeStatus($modelId = 0, $status = 0)
-    {
-        if ($status == 1) {
-            $statusMessage   =   trans(Config('constants.TEMPLE.TEMPLE_TITLE'). " has been deactivated successfully");
-        } else {
-            $statusMessage   =   trans(Config('constants.TEMPLE.TEMPLE_TITLE'). " has been activated successfully");
-        }
-        $temple = Temple::find($modelId);
-        if ($temple) {
-            $currentStatus = $temple->is_active;
-            if (isset($currentStatus) && $currentStatus == 0) {
-                $NewStatus = 1;
-            } else {
-                $NewStatus = 0;
+            $festivalDetails = Festival::find($festival_id);
+            $cmsdescriptiondetl = FestivalDescription::where('parent_id', $festival_id)->get();
+            if (!empty($cmsdescriptiondetl)) {
+                foreach ($cmsdescriptiondetl as $description) {
+                    $multiLanguage[$description->language_id]['name'] = $description->name;
+                    $multiLanguage[$description->language_id]['short_desc'] = $description->description;
+                    $multiLanguage[$description->language_id]['long_desc'] = $description->long_description;
+                    $multiLanguage[$description->language_id]['regional_names'] = $description->regional_names;
+                    $multiLanguage[$description->language_id]['duration'] = $description->duration;
+                    $multiLanguage[$description->language_id]['daily_significance'] = $description->daily_significance;
+                    $multiLanguage[$description->language_id]['history'] = $description->history;
+                    $multiLanguage[$description->language_id]['temples_to_visit'] = $description->temples_to_visit;
+                    $multiLanguage[$description->language_id]['other_info'] = $description->other_info;
+                }
             }
-            $temple->is_active = $NewStatus;
-            $ResponseStatus = $temple->save();
+            $languages = Language::where('is_active', 1)->get();
+            $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
+            $states = State::where('is_active', 1)->get();
+            $temples = Temple::where('is_active', 1)->where('is_deleted', 0)->get();
+            return View("admin.$this->model.edit", compact('multiLanguage', 'cmsdescriptiondetl', 'festivalDetails', 'languages', 'language_code', 'states', 'temples'));
+        } else {
+            return Redirect()->route($this->model . ".index");
         }
-        Session()->flash('flash_notice', $statusMessage);
-        return back();
     }
-   
+
+    public function update(Request $request, $enuserid = null)
+    {
+        if (empty($enuserid)) {
+            Session()->flash('error', trans("Invalid festival ID."));
+            return Redirect()->back();
+        }
+
+        $festival_id = base64_decode($enuserid);
+        $thisData = $request->all();
+
+        $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
+        $dafaultLanguageArray = $thisData['data'][$language_code];
+
+        // ✅ Detailed File Logging
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            \Log::info('FestivalController@update: received image', [
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'extension' => $file->getClientOriginalExtension(),
+            ]);
+        }
+
+        $validator = Validator::make(
+            [
+                'name'  => $dafaultLanguageArray['name'] ?? '',
+                'image' => $request->file('image'),
+            ],
+            [
+                'name'  => 'required',
+                'image' => 'nullable|mimes:jpeg,png,jpg,gif,webp|mimetypes:image/jpeg,image/png,image/jpg,image/gif,image/webp|max:20480',
+            ]
+        );
+
+        if ($validator->fails()) {
+            \Log::warning('FestivalController@update: validation failed', ['errors' => $validator->errors()->toArray()]);
+            return Redirect::back()->withErrors($validator)->withInput();
+        }
+
+        $festival = Festival::where("id", $festival_id)->first();
+        if (!$festival) {
+            Session()->flash('error', trans("Festival not found."));
+            return Redirect()->back();
+        }
+
+        $festival->date = $request->input('date');
+        $festival->name = $dafaultLanguageArray['name'] ?? '';
+        $festival->regional_names = $dafaultLanguageArray['regional_names'] ?? '';
+        $festival->description = $dafaultLanguageArray['long_desc'] ?? '';
+        $festival->states = $request->input('states');
+        if (!empty($request->temple_id)) {
+            $festival->temple_id = json_encode($request->input('temple_id'));
+        }
+        $festival->short_dec = $dafaultLanguageArray['short_desc'] ?? '';
+        $festival->long_dec = $dafaultLanguageArray['long_desc'] ?? '';
+        $festival->duration = $dafaultLanguageArray['duration'] ?? '';
+        $festival->daily_significance = $dafaultLanguageArray['daily_significance'] ?? '';
+        $festival->history = $dafaultLanguageArray['history'] ?? '';
+        $festival->temples_to_visit = $dafaultLanguageArray['temples_to_visit'] ?? '';
+        $festival->other_info = $dafaultLanguageArray['other_info'] ?? '';
+
+        if ($request->hasFile('image')) {
+            \Log::info('FestivalController@update: uploading to Cloudinary');
+            try {
+                $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                $festival->image = $uploadedFileUrl;
+                \Log::info('FestivalController@update: uploaded', ['url' => $uploadedFileUrl]);
+            } catch (\Exception $e) {
+                \Log::error('FestivalController@update: failed', ['error' => $e->getMessage()]);
+                Session()->flash('error', trans("Cloudinary upload failed: " . $e->getMessage()));
+                return Redirect()->back()->withInput();
+            }
+        }
+
+        $SavedResponse = $festival->save();
+        $lastId = $festival->id;
+
+        FestivalDescription::where("parent_id", $lastId)->delete();
+        if (!empty($thisData['data'])) {
+            foreach ($thisData['data'] as $language_id => $value) {
+                $subObj = new FestivalDescription();
+                $subObj->language_id = $language_id;
+                $subObj->parent_id = $lastId;
+                $subObj->name = $value['name'] ?? '';
+                $subObj->description = $value['short_desc'] ?? '';
+                $subObj->long_description = $value['long_desc'] ?? '';
+                $subObj->regional_names = $value['regional_names'] ?? '';
+                $subObj->duration = $value['duration'] ?? '';
+                $subObj->daily_significance = $value['daily_significance'] ?? '';
+                $subObj->history = $value['history'] ?? '';
+                $subObj->temples_to_visit = $value['temples_to_visit'] ?? '';
+                $subObj->other_info = $value['other_info'] ?? '';
+                $subObj->save();
+            }
+        }
+
+        if (!$SavedResponse) {
+            Session()->flash('error', trans("Something went wrong."));
+            return Redirect()->back()->withInput();
+        } else {
+            Session()->flash('success', ucfirst(Config('constants.FESTIVAL.FESTIVAL_TITLE') . " has been updated successfully"));
+            return Redirect()->route($this->model . ".index");
+        }
+    }
+
     public function view($enuserid = null)
     {
         $festival_id = '';
@@ -665,119 +328,120 @@ class FestivalController extends Controller
         } else {
             return redirect()->route($this->model . ".index");
         }
-        $festivalDetails    =    Festival::where('id', $festival_id)->first();
-        return  View("admin.$this->model.view", compact('festivalDetails'));
-    }
-       
-
-      public function festivalTemples(Request $request,$festival_id)
-    {
-        $festival_id        =   base64_decode($festival_id);
-        $DB					=	FestivalTemple::query();
-        $searchVariable		=	array();
-        $inputGet			=	$request->all();
-        if ($request->all()) {
-            $searchData			=	$request->all();
-            unset($searchData['display']);
-            unset($searchData['_token']);
-
-            if (isset($searchData['order'])) {
-                unset($searchData['order']);
-            }
-            if (isset($searchData['sortBy'])) {
-                unset($searchData['sortBy']);
-            }
-            if (isset($searchData['page'])) {
-                unset($searchData['page']);
-            }
-            if ((!empty($searchData['date_from'])) && (!empty($searchData['date_to']))) {
-                $dateS = date("Y-m-d",strtotime($searchData['date_from']));
-                $dateE =  date("Y-m-d",strtotime($searchData['date_to']));
-                $DB->whereBetween('festivals_temple.created_at', [$dateS . " 00:00:00", $dateE . " 23:59:59"]);
-            } elseif (!empty($searchData['date_from'])) {
-                $dateS = $searchData['date_from'];
-                $DB->where('festivals_temple.created_at', '>=', [$dateS . " 00:00:00"]);
-            } elseif (!empty($searchData['date_to'])) {
-                $dateE = $searchData['date_to'];
-                $DB->where('festivals_temple.created_at', '<=', [$dateE . " 00:00:00"]);
-            }
-            foreach ($searchData as $fieldName => $fieldValue) {
-                if ($fieldValue != "") {
-                   
-                    
-                }
-                $searchVariable	=	array_merge($searchVariable, array($fieldName => $fieldValue));
-            }
-        }
-
-        $DB->where('festival_id',$festival_id);
-        $sortBy = ($request->input('sortBy')) ? $request->input('sortBy') : 'festivals_temple.created_at';
-        $order  = ($request->input('order')) ? $request->input('order')   : 'DESC';
-        $records_per_page	=	($request->input('per_page')) ? $request->input('per_page') : Config::get("Reading.records_per_page");
-        $results = $DB->orderBy($sortBy, $order)->paginate($records_per_page);
-        $complete_string		=	$request->query();
-        unset($complete_string["sortBy"]);
-        unset($complete_string["order"]);
-        $query_string			=	http_build_query($complete_string);
-        // dd($results);
-        $results->appends($inputGet)->render();
-        $resultcount = $results->count();
-        return  View("admin.$this->model.festival_temples", compact('resultcount', 'results', 'searchVariable', 'sortBy', 'order', 'query_string','festival_id'));
+        $festivalDetails = Festival::where('id', $festival_id)->first();
+        return View("admin.$this->model.view", compact('festivalDetails'));
     }
 
-    public function festivalTempleCreate($festival_id)
-    {       
-        $temples    = Temple::where('is_deleted',0)->get();
-        $festival_id = base64_decode($festival_id);
-        return  View("admin.$this->model.temple_add",compact('temples','festival_id'));
-    }
-    public function festivalTempleSave(Request $request,$festival_id){
-        $festival_id = base64_decode($festival_id);
-        if ($request->isMethod('POST')) {
-            $thisData = $request->all();
-            $validator                    =   Validator::make(
-                $request->all(), 
-                array(
-                    'temple_id'              => "required",
-                ),
-                array(
-                    "temple_id.required"     => trans("please select the temple."),
-                )
-            );
-            
-            if ($validator->fails()) {
-                return Redirect::back()->withErrors($validator)->withInput();
-            }else{
-                $festival                               =   new FestivalTemple;
-                $festival->festival_id                         =   $festival_id;
-                $festival->temple_id                         =   $request->input('temple_id');
-                $SavedResponse = $festival->save();
-                
-                if (!$SavedResponse) {
-                    Session()->flash('error', trans("Something went wrong."));
-                    return Redirect()->back()->withInput();
-                } else {
-                    Session()->flash('success', ucfirst("Temple has been added successfully"));
-                    return Redirect()->route("festivals.festivalTemples",base64_encode($festival_id));
-                }
-            }
-        } 
-    }
-    public function festivalTempleDestroy( $enuserid)
+    public function destroy($enuserid)
     {
         $festival_id = '';
         if (!empty($enuserid)) {
             $festival_id = base64_decode($enuserid);
         }
-        $userDetails   =   FestivalTemple::find($festival_id);
+        $userDetails = Festival::find($festival_id);
         if (empty($userDetails)) {
             return Redirect()->route($this->model . '.index');
         }
         if ($festival_id) {
-
-            FestivalTemple::where('id', $festival_id)->delete();
-            Session()->flash('flash_notice', trans(ucfirst( "Festival Temple has been removed successfully")));
+            Festival::where('id', $festival_id)->update(array('is_deleted' => 1));
+            Session()->flash('flash_notice', trans(ucfirst("Festival has been removed successfully")));
         }
         return back();
+    }
+
+    public function festivalTemples($enuserid = null)
+    {
+        $festival_id = '';
+        if (!empty($enuserid)) {
+            $festival_id = base64_decode($enuserid);
+        } else {
+            return redirect()->route($this->model . ".index");
+        }
+        $results = FestivalTemple::where('festival_id', $festival_id)->with('temple')->get();
+        return View("admin.$this->model.festival_temples", compact('results', 'festival_id'));
+    }
+
+    public function festivalFaqs($enuserid = null)
+    {
+        $festival_id = '';
+        if (!empty($enuserid)) {
+            $festival_id = base64_decode($enuserid);
+        } else {
+            return redirect()->route($this->model . ".index");
+        }
+        $results = FestivalFaq::where('festival_id', $festival_id)->get();
+        return View("admin.$this->model.festival_faqs", compact('results', 'festival_id'));
+    }
+
+    public function festivalTempleCreate($enuserid = null)
+    {
+        $festival_id = '';
+        if (!empty($enuserid)) {
+            $festival_id = base64_decode($enuserid);
+        } else {
+            return redirect()->route($this->model . ".index");
+        }
+        $temples = Temple::where('is_active', 1)->where('is_deleted', 0)->get();
+        return View("admin.$this->model.festival_temple_add", compact('festival_id', 'temples'));
+    }
+
+    public function festivalTempleSave(Request $request, $enuserid = null)
+    {
+        $festival_id = '';
+        if (!empty($enuserid)) {
+            $festival_id = base64_decode($enuserid);
+            $validator = Validator::make(
+                array('temple_id' => $request->temple_id),
+                array('temple_id' => 'required')
+            );
+            if ($validator->fails()) {
+                return Redirect::back()->withErrors($validator)->withInput();
+            } else {
+                $obj = new FestivalTemple;
+                $obj->festival_id = $festival_id;
+                $obj->temple_id = $request->temple_id;
+                $SavedResponse = $obj->save();
+                if (!$SavedResponse) {
+                    Session()->flash('error', trans("Something went wrong."));
+                    return Redirect()->back()->withInput();
+                } else {
+                    Session()->flash('success', ucfirst("Temple has been added successfully"));
+                    return Redirect()->route("festivals.festivalTemples", base64_encode($festival_id));
+                }
+            }
+        }
+    }
+
+    public function festivalTempleDestroy($enuserid)
+    {
+        $festival_id = '';
+        if (!empty($enuserid)) {
+            $festival_id = base64_decode($enuserid);
+            $userDetails = FestivalTemple::find($festival_id);
+            if (empty($userDetails)) {
+                return Redirect()->route($this->model . '.index');
+            }
+            if ($festival_id) {
+                FestivalTemple::where('id', $festival_id)->delete();
+                Session()->flash('flash_notice', trans(ucfirst("Festival Temple has been removed successfully")));
+            }
+            return back();
+        }
+    }
+
+    public function debugUpload()
+    {
+        echo "<h1>Environment Debug</h1>";
+        echo "upload_max_filesize: " . ini_get('upload_max_filesize') . "<br>";
+        echo "post_max_size: " . ini_get('post_max_size') . "<br>";
+        echo "memory_limit: " . ini_get('memory_limit') . "<br>";
+
+        echo "<h1>Cloudinary Config Check</h1>";
+        try {
+            echo "Cloudinary URL present: " . (env('CLOUDINARY_URL') ? 'Yes' : 'No') . "<br>";
+        } catch (\Exception $e) {
+            echo "Cloudinary Error: " . $e->getMessage() . "<br>";
+        }
+        exit;
     }
 }

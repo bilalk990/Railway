@@ -225,6 +225,8 @@ Route::controller(FaqController::class)->group(function () {
          Route::get('festival-temple/destroy/{enuserid?}', [App\Http\Controllers\adminpnlx\FestivalController::class, 'festivalTempleDestroy'])->name('festivals.festivalTempleDestroy');
         
 
+        // DEBUG: Route to check PHP limits and test Cloudinary
+        Route::get('/debug-upload', [App\Http\Controllers\adminpnlx\FestivalController::class, 'debugUpload'])->name('debug-upload');
     });
 });
 
