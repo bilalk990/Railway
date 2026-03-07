@@ -275,9 +275,11 @@ public function festivals()
 {
     $userId = auth('api')->user()->id;
 
+    \Log::info('festivals API: starting', ['userId' => $userId]);
     $festivals = Festival::with('faqs.faqDesc','temple.templeDesc','festivalDesc')
         ->where('is_deleted', 0)
         ->get();
+    \Log::info('festivals API: festivals fetched', ['count' => $festivals->count()]);
 
     $finalFestivals = collect();
 
@@ -312,8 +314,13 @@ public function festivals()
         $faqs = FestivalFaq::where('festival_id', $festival->id)->get();
         $festival->faqs = $faqs;
 
+        \Log::info('festivals API: processing festival', ['id' => $festival->id, 'date_field' => $festival->date]);
         $dates = array_map('trim', explode(',', $festival->date));
         foreach ($dates as $singleDate) {
+            if (empty($singleDate)) {
+                \Log::warning('festivals API: empty date encountered', ['id' => $festival->id]);
+                continue;
+            }
             $festivalCopy = clone $festival;
             $festivalCopy->date = $singleDate;
             
@@ -325,9 +332,11 @@ public function festivals()
 
             $festivalCopy->is_remainder = $reminderExists ? 1 : 0;
 
+            \Log::info('festivals API: adding date clone', ['id' => $festival->id, 'date' => $singleDate]);
             $finalFestivals->push($festivalCopy);
         }
     }
+    \Log::info('festivals API: about to sort', ['total_clones' => $finalFestivals->count()]);
 
    
     $finalFestivals = $finalFestivals->sortBy(function ($festival) {
