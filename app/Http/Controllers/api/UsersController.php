@@ -271,86 +271,88 @@ public function login(Request $request)
 
 
 
-public function festivals()
-{
-    $userId = auth('api')->user()->id;
+    public function festivals()
+    {
+        $userId = auth('api')->user()->id;
 
-    \Log::info('festivals API: starting', ['userId' => $userId]);
-    $festivals = Festival::with('faqs.faqDesc','temple.templeDesc','festivalDesc')
-        ->where('is_deleted', 0)
-        ->get();
-    \Log::info('festivals API: festivals fetched', ['count' => $festivals->count()]);
+        // 1. Fetch festivals with relationships (eager load descriptions and faqs)
+        $festivals = Festival::with(['faqs.faqDesc', 'festivalDesc'])
+            ->where('is_deleted', 0)
+            ->get();
 
-    $finalFestivals = collect();
+        // 2. Fetch all user reminders at once and group them by festival and date for quick lookup
+        $remindersByFestivalAndDate = Reminder::where('user_id', $userId)
+            ->get()
+            ->groupBy(function ($item) {
+                return $item->festival_id . '_' . $item->date;
+            });
 
-    foreach ($festivals as $festival) {
-
-        $festival->image = (!empty($festival->image) && str_starts_with($festival->image, 'http')) ? $festival->image : config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
-
-
-        $templeIds = json_decode($festival->temple_id, true);
-
-        if (is_array($templeIds) && count($templeIds) > 0) {
-            $temples = Temple::whereIn('id', $templeIds)
-                ->where('is_deleted', 0)
-                ->get();
-
-
-            foreach ($temples as $temple) {
-                $temple->image = (!empty($temple->image) && str_starts_with($temple->image, 'http')) ? $temple->image : config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
+        // 3. Collect unique temple IDs from JSON column to fetch them in bulk
+        $allTempleIds = [];
+        foreach ($festivals as $festival) {
+            $ids = json_decode($festival->temple_id, true);
+            if (is_array($ids)) {
+                $allTempleIds = array_merge($allTempleIds, $ids);
             }
-
-            $festival->temples = $temples;
-        } else {
-            $festival->temples = [];
         }
-    //     $reminderExists = Reminder::where('festival_id', $festival->id)
-    //     ->where('user_id', $userId)
-    //     ->exists();
+        $allTempleIds = array_unique(array_filter($allTempleIds));
+        $allTemples = Temple::with('templeDesc')->whereIn('id', $allTempleIds)->where('is_deleted', 0)->get()->keyBy('id');
 
-    //    $festival->is_remainder = $reminderExists ? 1 : 0;
+        $finalFestivals = collect();
 
+        foreach ($festivals as $festival) {
+            // Handle image path (Cloudinary or local)
+            $festival->image = (!empty($festival->image) && str_starts_with($festival->image, 'http')) 
+                ? $festival->image 
+                : config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
 
-        $faqs = FestivalFaq::where('festival_id', $festival->id)->get();
-        $festival->faqs = $faqs;
-
-        \Log::info('festivals API: processing festival', ['id' => $festival->id, 'date_field' => $festival->date]);
-        $dates = array_map('trim', explode(',', $festival->date));
-        foreach ($dates as $singleDate) {
-            if (empty($singleDate)) {
-                \Log::warning('festivals API: empty date encountered', ['id' => $festival->id]);
-                continue;
+            // Assign pre-fetched temples based on JSON temple_id
+            $templeIds = json_decode($festival->temple_id, true);
+            $festivalTemples = [];
+            if (is_array($templeIds)) {
+                foreach ($templeIds as $tid) {
+                    if (isset($allTemples[$tid])) {
+                        $temple = $allTemples[$tid];
+                        $temple->image = (!empty($temple->image) && str_starts_with($temple->image, 'http')) 
+                            ? $temple->image 
+                            : config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
+                        $festivalTemples[] = clone $temple; // Clone to avoid sharing state
+                    }
+                }
             }
-            $festivalCopy = clone $festival;
-            $festivalCopy->date = $singleDate;
-            
-            // 🔥 Check reminder for specific festival_id + date
-            $reminderExists = Reminder::where('festival_id', $festival->id)
-            ->where('user_id', $userId)
-            ->where('date', $singleDate)   // ⬅ KEY FIX
-            ->exists();
+            $festival->temples = $festivalTemples;
 
-            $festivalCopy->is_remainder = $reminderExists ? 1 : 0;
+            // Split dates and process each date as a separate festival entry
+            $dates = array_map('trim', explode(',', $festival->date));
+            foreach ($dates as $singleDate) {
+                if (empty($singleDate)) continue;
 
-            \Log::info('festivals API: adding date clone', ['id' => $festival->id, 'date' => $singleDate]);
-            $finalFestivals->push($festivalCopy);
+                $festivalCopy = clone $festival;
+                $festivalCopy->date = $singleDate;
+                
+                // Check reminder status from memory
+                $key = $festival->id . '_' . $singleDate;
+                $festivalCopy->is_remainder = isset($remindersByFestivalAndDate[$key]) ? 1 : 0;
+
+                $finalFestivals->push($festivalCopy);
+            }
         }
+
+        // Sort the exploded entries by date
+        $finalFestivals = $finalFestivals->sortBy(function ($festival) {
+            try {
+                return \Carbon\Carbon::parse($festival->date);
+            } catch (\Exception $e) {
+                return \Carbon\Carbon::now()->addYears(10); 
+            }
+        })->values();
+
+        return response()->json([
+            "status" => "success",
+            "data"   => $finalFestivals,
+            "msg"    => "",
+        ], 200);
     }
-    \Log::info('festivals API: about to sort', ['total_clones' => $finalFestivals->count()]);
-
-   
-    $finalFestivals = $finalFestivals->sortBy(function ($festival) {
-        return \Carbon\Carbon::parse($festival->date);
-    })->values();
-
-    $response = [
-        "status" => "success",
-        "data"   => $finalFestivals,
-        "msg"    => trans(""),
-    ];
-
-    return response()->json($response, 200);
-}
 
 
 
