@@ -1029,10 +1029,8 @@ public function getPanchang(Request $request)
             $email    = $request->input('email');
             $name     = $request->input('name', '');
 
-            \Log::info('socialLogin: starting', ['email' => $email, 'social_id' => $socialId]);
-        // Step 1: Try to find user by social_id
-        $user = User::where('social_id', $socialId)->first();
-        \Log::info('socialLogin: step 1 done', ['found' => (bool)$user]);
+            // Step 1: Try to find user by social_id
+            $user = User::where('social_id', $socialId)->first();
 
             // Step 2: If not found by social_id, try by email (if provided)
             if (!$user && $email) {
@@ -1060,9 +1058,8 @@ public function getPanchang(Request $request)
                 $user->phone_prefix       = $request->input('phone_prefix', '');
                 $user->phone_country_code = $request->input('phone_country_code', '');
                 $user->phone_number       = $request->input('phone_number', '');
-                \Log::info('socialLogin: step 2 done (linked)');
+                $user->save();
             }
-        \Log::info('socialLogin: final check before create');
      // Step 4: Check if user is active
             if ($user->is_active == 0 || $user->is_deleted == 1) {
                 return response()->json([
@@ -1084,10 +1081,8 @@ public function getPanchang(Request $request)
                 ]);
             }
 
-            \Log::info('socialLogin: about to create token');
-        // Step 6: Generate Passport access token
-        $token = $user->createToken('API Token')->accessToken;
-        \Log::info('socialLogin: token created');
+            // Step 6: Generate Passport access token
+            $token = $user->createToken('API Token')->accessToken;
 
             // Step 7: Create notification settings if not exists
             NotificationSetting::firstOrCreate(
