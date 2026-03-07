@@ -258,7 +258,8 @@ class Controller extends BaseController
     function getFirebaseAccessToken() {
     $keyFilePath = public_path('remyndnow-8ce2fb96e90f.json');
     if (!file_exists($keyFilePath)) {
-        throw new Exception('Service account file not found');
+        \Log::error('FCM: Service account file not found at ' . $keyFilePath);
+        throw new \Exception('Service account file not found');
     }
 
     $key = json_decode(file_get_contents($keyFilePath), true);
@@ -301,7 +302,9 @@ class Controller extends BaseController
 
     $response = curl_exec($ch);
     if (curl_errno($ch)) {
-        throw new Exception('Curl error: ' . curl_error($ch));
+        $error_msg = curl_error($ch);
+        \Log::error('FCM: Curl error fetching access token', ['error' => $error_msg]);
+        throw new \Exception('Curl error: ' . $error_msg);
     }
 
     curl_close($ch);
@@ -309,7 +312,8 @@ class Controller extends BaseController
     $jsonResponse = json_decode($response, true);
 
     if (isset($jsonResponse['error'])) {
-        throw new Exception('Error fetching access token: ' . $jsonResponse['error']);
+        \Log::error('FCM: Error fetching access token from Google', ['response' => $jsonResponse]);
+        throw new \Exception('Error fetching access token: ' . (is_array($jsonResponse['error']) ? json_encode($jsonResponse['error']) : $jsonResponse['error']));
     }
 
     return $jsonResponse['access_token'];
