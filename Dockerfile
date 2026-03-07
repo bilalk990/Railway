@@ -25,6 +25,9 @@ RUN mkdir -p storage/framework/cache/data \
 # Set permissions
 RUN chmod -R 775 storage bootstrap/cache
 
+# Copy custom PHP configuration
+COPY php.ini /usr/local/etc/php/php.ini
+
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
