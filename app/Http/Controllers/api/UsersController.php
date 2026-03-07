@@ -428,114 +428,112 @@ public function login(Request $request)
 // }
 
 
-public function festivalstab(Request $request)
-{
-    // $response = $this->send_push_notification(
-    //     "dpw0F2QUQB6JPgPS7orkZA:APA91bH889rx0m5fCgCVFtQPri2bcdsl7mDzMkl65V7bSXzA2KmenPX6oxhhGg8quuD1RYy91qdOiUJTzA-DD4mNpXWxeaUPjp_lTcozEzx4k4hODyHj0gk",
-    //     "android",
-    //     "This is a test push",
-    //     "Test Title",
-    //     "test_notification",
-    //     ["extra" => "data"]
-    // );
-    
-    // dd($response);
-    $userId = auth('api')->user()->id;
-    
-    $festivalsQuery = Festival::with('faqs.faqDesc', 'temple.templeDesc', 'festivalDesc')
-        ->where('is_deleted', 0);
-        // ->get();
+    public function festivalstab(Request $request)
+    {
+        $userId = auth('api')->user()->id;
 
-    $singleFestivals = collect();
-    $multipleFestivals = collect();
-    if ($request->has('state_id') && !empty($request->state_id)) {
-        $stateId = $request->state_id;
-        $festivalsQuery->whereJsonContains('states', $stateId);
-    }
+        // 1. Build Query
+        $festivalsQuery = Festival::with(['festivalDesc'])
+            ->where('is_deleted', 0);
 
-    //   if ($request->has('state_id') && !empty($request->state_id)) {
-    //     $stateId = $request->state_id;
-        
-    //     // If state_id is an array (multiple states), use whereJsonContains for each
-    //     if (is_array($stateId)) {
-    //         $festivalsQuery->where(function($query) use ($stateId) {
-    //             foreach ($stateId as $state) {
-    //                 $query->orWhereJsonContains('states', (int)$state);
-    //             }
-    //         });
-    //     } else {
-    //         // Single state filter
-    //         $festivalsQuery->whereJsonContains('states', (int)$stateId);
-    //     }
-    // }
-    $festivals = $festivalsQuery->get();
-    foreach ($festivals as $festival) {
+        if ($request->has('state_id') && !empty($request->state_id)) {
+            $stateId = $request->state_id;
+            $festivalsQuery->whereJsonContains('states', $stateId);
+        }
 
-        // Festival image
-        $festival->image = (!empty($festival->image) && str_starts_with($festival->image, 'http')) ? $festival->image : config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
+        $festivals = $festivalsQuery->get();
 
-        // Temple handling
-        $templeIds = json_decode($festival->temple_id, true);
-        if (is_array($templeIds) && count($templeIds) > 0) {
-            $temples = Temple::whereIn('id', $templeIds)
-                ->where('is_deleted', 0)
-                ->get();
+        // 2. Fetch all user reminders at once
+        $remindersByFestivalAndDate = Reminder::where('user_id', $userId)
+            ->get()
+            ->groupBy(function ($item) {
+                return $item->festival_id . '_' . $item->date;
+            });
 
-            foreach ($temples as $temple) {
-                $temple->image = (!empty($temple->image) && str_starts_with($temple->image, 'http')) ? $temple->image : config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
+        // 3. Fetch all FestivalFaqs at once
+        $allFaqs = FestivalFaq::whereIn('festival_id', $festivals->pluck('id'))->get()->groupBy('festival_id');
+
+        // 4. Collect unique temple IDs from JSON column to fetch them in bulk
+        $allTempleIds = [];
+        foreach ($festivals as $festival) {
+            $ids = json_decode($festival->temple_id, true);
+            if (is_array($ids)) {
+                $allTempleIds = array_merge($allTempleIds, $ids);
             }
+        }
+        $allTempleIds = array_unique(array_filter($allTempleIds));
+        $allTemples = Temple::with('templeDesc')->whereIn('id', $allTempleIds)->where('is_deleted', 0)->get()->keyBy('id');
 
-            $festival->temples = $temples;
-        } else {
-            $festival->temples = [];
+        $singleFestivals = collect();
+        $multipleFestivals = collect();
+
+        foreach ($festivals as $festival) {
+            // Handle image path (Cloudinary or local)
+            $festival->image = (!empty($festival->image) && str_starts_with($festival->image, 'http')) 
+                ? $festival->image 
+                : config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
+
+            // Assign pre-fetched temples
+            $templeIds = json_decode($festival->temple_id, true);
+            $festivalTemples = [];
+            if (is_array($templeIds)) {
+                foreach ($templeIds as $tid) {
+                    if (isset($allTemples[$tid])) {
+                        $temple = $allTemples[$tid];
+                        $temple->image = (!empty($temple->image) && str_starts_with($temple->image, 'http')) 
+                            ? $temple->image 
+                            : config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
+                        $festivalTemples[] = clone $temple;
+                    }
+                }
+            }
+            $festival->temples = $festivalTemples;
+
+            // Assign faqs
+            $festival->faqs = $allFaqs->get($festival->id, collect());
+
+            // Handle dates and categorization
+            $dates = array_map('trim', explode(',', $festival->date));
+            if (count($dates) === 1) {
+                $festival->date = $dates[0];
+                $festival->is_multiple_festival = 0; 
+                
+                // Check reminder for the single date
+                $key = $festival->id . '_' . $dates[0];
+                $festival->is_remainder = isset($remindersByFestivalAndDate[$key]) ? 1 : 0;
+                
+                $singleFestivals->push($festival);
+            } else {
+                $festival->date = $dates[0]; // first date as main
+                $festival->festival_dates = $dates;
+                $festival->is_multiple_festival = 1; 
+
+                // Check reminder for the main date
+                $key = $festival->id . '_' . $dates[0];
+                $festival->is_remainder = isset($remindersByFestivalAndDate[$key]) ? 1 : 0;
+
+                $multipleFestivals->push($festival);
+            }
         }
 
-        // FAQs
-        $faqs = FestivalFaq::where('festival_id', $festival->id)->get();
-        $festival->faqs = $faqs;
+        // 5. Sorting
+        $singleFestivals = $singleFestivals->sortBy(function ($f) {
+            try { return \Carbon\Carbon::parse($f->date); } catch (\Exception $e) { return \Carbon\Carbon::now()->addYears(10); }
+        })->values();
 
-        $reminderExists = Reminder::where('festival_id', $festival->id)
-        ->where('user_id', $userId)
-        ->exists();
+        $multipleFestivals = $multipleFestivals->sortBy(function ($f) {
+            try { return \Carbon\Carbon::parse($f->date); } catch (\Exception $e) { return \Carbon\Carbon::now()->addYears(10); }
+        })->values();
 
-       $festival->is_remainder = $reminderExists ? 1 : 0;
-
-
-        // Dates
-        $dates = array_map('trim', explode(',', $festival->date));
-
-        if (count($dates) === 1) {
-            $festival->date = $dates[0];
-            $festival->is_multiple_festival = 0; 
-            $singleFestivals->push($festival);
-        } else {
-            $festival->date = $dates[0]; // first date as main
-            $festival->festival_dates = $dates;
-            $festival->is_multiple_festival = 1; 
-            $multipleFestivals->push($festival);
-        }
+        return response()->json([
+            "status" => "success",
+            "data"   => [
+                "single_festivals"   => $singleFestivals,
+                "multiple_festivals" => $multipleFestivals,
+            ],
+            "msg"    => "",
+        ], 200);
     }
-
-    // Sorting both groups
-    $singleFestivals = $singleFestivals->sortBy(function ($festival) {
-        return Carbon::parse($festival->date);
-    })->values();
-
-    $multipleFestivals = $multipleFestivals->sortBy(function ($festival) {
-        return Carbon::parse($festival->date);
-    })->values();
-
-    $response = [
-        "status" => "success",
-        "data"   => [
-            "single_festivals"   => $singleFestivals,
-            "multiple_festivals" => $multipleFestivals,
-        ],
-        "msg"    => "",
-    ];
-
-    return response()->json($response, 200);
-}
 
 
 public function festivalDetail($id)
