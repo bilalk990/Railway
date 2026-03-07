@@ -25,10 +25,12 @@ class FestivalController extends Controller
 
     public function __construct()
     {
+        parent::__construct();
         $this->middleware(function ($request, $next) {
             $this->user = Auth::guard('admin')->user();
             return $next($request);
         });
+        View()->share('model', $this->model);
     }
 
     public function index(Request $request)
