@@ -290,18 +290,8 @@ class FestivalController extends Controller
     
                 // ✅ Image upload
                 if ($request->hasFile('image')) {
-                    $extension  = $request->file('image')->getClientOriginalExtension();
-                    $fileName   = time() . '-image.' . $extension;
-                    $folderName = strtoupper(date('M') . date('Y')) . "/";
-                    $folderPath = Config('constants.FESTIVAL_IMAGE_ROOT_PATH') . $folderName;
-    
-                    if (!file_exists($folderPath)) {
-                        mkdir($folderPath, 0777, true);
-                    }
-    
-                    if ($request->file('image')->move($folderPath, $fileName)) {
-                        $festival->image = $folderName . $fileName;
-                    }
+                    $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                    $festival->image = $uploadedFileUrl;
                 }
     
                 // ✅ Save festival
@@ -540,18 +530,8 @@ class FestivalController extends Controller
 
     // ✅ Handle image upload
     if ($request->hasFile('image')) {
-        $extension  = $request->file('image')->getClientOriginalExtension();
-        $fileName   = time() . '-image.' . $extension;
-        $folderName = strtoupper(date('M') . date('Y')) . "/";
-        $folderPath = Config('constants.FESTIVAL_IMAGE_ROOT_PATH') . $folderName;
-
-        if (!file_exists($folderPath)) {
-            mkdir($folderPath, 0777, true);
-        }
-
-        if ($request->file('image')->move($folderPath, $fileName)) {
-            $festival->image = $folderName . $fileName;
-        }
+        $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+        $festival->image = $uploadedFileUrl;
     }
 
     // ✅ Save main table

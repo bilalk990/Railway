@@ -119,14 +119,8 @@ class TempleController extends Controller
                 $temple->url                          =   $request->input('url');
                 $temple->name                         =   $dafaultLanguageArray['name'] ?? '';
                 if ($request->hasFile('image')) {
-                    $extension = $request->file('image')->getClientOriginalExtension();
-                    $fileName = time() . '-image.' . $extension;
-                    $folderName = strtoupper(date('M') . date('Y')) . "/";
-                    $folderPath = Config('constants.TEMPLE_IMAGE_ROOT_PATH') . $folderName;
-                    
-                    if ($request->file('image')->move($folderPath, $fileName)) {
-                        $temple->image = $folderName . $fileName;
-                    }
+                    $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                    $temple->image = $uploadedFileUrl;
                 }
                 $SavedResponse = $temple->save();
                 $lastId = $temple->id;
@@ -201,14 +195,8 @@ class TempleController extends Controller
                 $temple->url                         =   $request->url;
                  
                if ($request->hasFile('image')) {
-                    $extension = $request->file('image')->getClientOriginalExtension();
-                    $fileName = time() . '-image.' . $extension;
-                    $folderName = strtoupper(date('M') . date('Y')) . "/";
-                    $folderPath = Config('constants.TEMPLE_IMAGE_ROOT_PATH') . $folderName;
-                    
-                    if ($request->file('image')->move($folderPath, $fileName)) {
-                        $temple->image = $folderName . $fileName;
-                    }
+                    $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                    $temple->image = $uploadedFileUrl;
                 }
                 $SavedResponse = $temple->save();
                 $lastId = $temple->id;

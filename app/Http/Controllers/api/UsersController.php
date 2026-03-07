@@ -260,7 +260,7 @@ public function login(Request $request)
 
          $temples        = Temple::where('is_deleted',0)->with('templeDesc')->get();
          foreach($temples as $temple){
-            $temple->image      = config('constants.TEMPLE_IMAGE_PATH').$temple->image;
+            $temple->image      = (!empty($temple->image) && str_starts_with($temple->image, 'http')) ? $temple->image : config('constants.TEMPLE_IMAGE_PATH').$temple->image;
          }
                 $response                    =    array();
                 $response["status"]            =    "success";
@@ -283,7 +283,7 @@ public function festivals()
 
     foreach ($festivals as $festival) {
 
-        $festival->image = config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
+        $festival->image = (!empty($festival->image) && str_starts_with($festival->image, 'http')) ? $festival->image : config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
 
 
         $templeIds = json_decode($festival->temple_id, true);
@@ -295,7 +295,7 @@ public function festivals()
 
 
             foreach ($temples as $temple) {
-                $temple->image = config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
+                $temple->image = (!empty($temple->image) && str_starts_with($temple->image, 'http')) ? $temple->image : config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
             }
 
             $festival->temples = $temples;
@@ -459,7 +459,7 @@ public function festivalstab(Request $request)
     foreach ($festivals as $festival) {
 
         // Festival image
-        $festival->image = config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
+        $festival->image = (!empty($festival->image) && str_starts_with($festival->image, 'http')) ? $festival->image : config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
 
         // Temple handling
         $templeIds = json_decode($festival->temple_id, true);
@@ -469,7 +469,7 @@ public function festivalstab(Request $request)
                 ->get();
 
             foreach ($temples as $temple) {
-                $temple->image = config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
+                $temple->image = (!empty($temple->image) && str_starts_with($temple->image, 'http')) ? $temple->image : config('constants.TEMPLE_IMAGE_PATH') . $temple->image;
             }
 
             $festival->temples = $temples;
@@ -533,7 +533,7 @@ public function festivalDetail($id)
         ->first();
 
     if ($festival) {
-        $festival->image = config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
+        $festival->image = (!empty($festival->image) && str_starts_with($festival->image, 'http')) ? $festival->image : config('constants.FESTIVAL_IMAGE_PATH') . $festival->image;
 
         // fetch temples manually through FestivalTemple
         $temples = FestivalTemple::with('temple.templeDesc')
@@ -541,7 +541,7 @@ public function festivalDetail($id)
             ->get();
             
         foreach ($temples as $value) {
-            $value->temple->image = config('constants.TEMPLE_IMAGE_PATH') .$value->temple->image;
+            $value->temple->image = (!empty($value->temple->image) && str_starts_with($value->temple->image, 'http')) ? $value->temple->image : config('constants.TEMPLE_IMAGE_PATH') .$value->temple->image;
         }
 
         $festival->temples = $temples; // attach temples into response
@@ -592,14 +592,8 @@ public function updateProfile(Request $request){
             $obj->notify             = $request->input('notify');
          
            if ($request->hasFile('image')) {
-                $extension = $request->file('image')->getClientOriginalExtension();
-                $fileName = time() . '-image.' . $extension;
-                $folderName = strtoupper(date('M') . date('Y')) . "/";
-                $folderPath = Config('constants.USER_IMAGE_ROOT_PATH') . $folderName;
-                
-                if ($request->file('image')->move($folderPath, $fileName)) {
-                    $obj->image = $folderName . $fileName;
-                }
+                $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                $obj->image = $uploadedFileUrl;
             }
 
             $obj->save();
