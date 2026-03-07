@@ -4,7 +4,15 @@
 if [ ! -f storage/oauth-private.key ]; then
     php artisan passport:keys --force || true
 fi
+# Ensure storage directories exist
+mkdir -p storage/framework/sessions
+mkdir -p storage/framework/views
+mkdir -p storage/framework/cache
+chmod -R 777 storage bootstrap/cache
+
 php artisan migrate --force || true
+php artisan config:clear
+php artisan view:clear
 
 # Start the Laravel schedule:run command in an infinite loop in the background
 echo "Starting Laravel scheduler in the background..."

@@ -275,8 +275,8 @@ public function login(Request $request)
     {
         $userId = auth('api')->user()->id;
 
-        // 1. Fetch festivals with relationships (eager load descriptions and faqs)
-        $festivals = Festival::with(['faqs.faqDesc', 'festivalDesc'])
+        // 1. Fetch festivals with relationships
+        $festivals = Festival::with(['festivalDesc'])
             ->where('is_deleted', 0)
             ->get();
 
@@ -287,7 +287,10 @@ public function login(Request $request)
                 return $item->festival_id . '_' . $item->date;
             });
 
-        // 3. Collect unique temple IDs from JSON column to fetch them in bulk
+        // 3. Fetch all FestivalFaqs at once
+        $allFaqs = FestivalFaq::whereIn('festival_id', $festivals->pluck('id'))->get()->groupBy('festival_id');
+
+        // 4. Collect unique temple IDs from JSON column to fetch them in bulk
         $allTempleIds = [];
         foreach ($festivals as $festival) {
             $ids = json_decode($festival->temple_id, true);
@@ -321,6 +324,9 @@ public function login(Request $request)
                 }
             }
             $festival->temples = $festivalTemples;
+
+            // Assign faqs
+            $festival->faqs = $allFaqs->get($festival->id, collect());
 
             // Split dates and process each date as a separate festival entry
             $dates = array_map('trim', explode(',', $festival->date));
