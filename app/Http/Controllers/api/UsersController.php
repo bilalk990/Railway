@@ -441,22 +441,17 @@ public function login(Request $request)
             $festivalsQuery->whereJsonContains('states', $stateId);
         }
 
-        \Log::info('festivalstab API: fetching festivals');
         $festivals = $festivalsQuery->get();
-        \Log::info('festivalstab API: festivals fetched', ['count' => $festivals->count()]);
 
-        \Log::info('festivalstab API: fetching reminders');
         $remindersByFestivalAndDate = Reminder::where('user_id', $userId)
             ->get()
             ->groupBy(function ($item) {
                 return $item->festival_id . '_' . $item->date;
             });
-        \Log::info('festivalstab API: reminders fetched');
 
         // 3. Fetch all FestivalFaqs at once
         $allFaqs = FestivalFaq::whereIn('festival_id', $festivals->pluck('id'))->get()->groupBy('festival_id');
 
-        \Log::info('festivalstab API: fetching temples');
         $allTempleIds = [];
         foreach ($festivals as $festival) {
             $ids = json_decode($festival->temple_id, true);
@@ -466,7 +461,6 @@ public function login(Request $request)
         }
         $allTempleIds = array_unique(array_filter($allTempleIds));
         $allTemples = Temple::with('templeDesc')->whereIn('id', $allTempleIds)->where('is_deleted', 0)->get()->keyBy('id');
-        \Log::info('festivalstab API: temples fetched');
 
         $singleFestivals = collect();
         $multipleFestivals = collect();
