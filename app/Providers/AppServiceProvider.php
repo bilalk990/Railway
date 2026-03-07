@@ -38,18 +38,25 @@ class AppServiceProvider extends ServiceProvider
         }
 
         try {
-            $youtube   = Setting::where('key','Social.youtube')->first();
-            $facebook  = Setting::where('key','Social.facebook')->first();
-            $twitter   = Setting::where('key','Social.twitter')->first();
-            $linkedin  = Setting::where('key','Social.linkedin')->first();
-            $copyright  = Setting::where('key','Site.right')->first();
-            View::share('youtube', $youtube);
-            View::share('facebook', $facebook);
-            View::share('twitter', $twitter);
-            View::share('linkedin', $linkedin);
-            View::share('copyright', $copyright);
+            $settingKeys = [
+                'Social.youtube',
+                'Social.facebook',
+                'Social.twitter',
+                'Social.linkedin',
+                'Site.right'
+            ];
+            
+            $settings = Setting::whereIn('key', $settingKeys)->get()->keyBy('key');
+            
+            View::share([
+                'youtube'   => $settings->get('Social.youtube'),
+                'facebook'  => $settings->get('Social.facebook'),
+                'twitter'   => $settings->get('Social.twitter'),
+                'linkedin'  => $settings->get('Social.linkedin'),
+                'copyright' => $settings->get('Site.right'),
+            ]);
         } catch (\Exception $e) {
-            // Settings table may not exist yet (fresh install / migrations pending)
+            // Settings table may not exist yet
         }
 
     }

@@ -20,14 +20,17 @@ if(!function_exists('lookbycode'))
 {
     function lookbycode($id=Null)
     {
-      $lookVal='';
-        if(!empty($id))
-        {
-            $lookVal='';
-        $lookVal=Lookup::where('id','=',$id)->value('code');
-
+      static $lookCache = [];
+      if(!empty($id))
+      {
+        if (isset($lookCache[$id])) {
+            return $lookCache[$id];
         }
-         return $lookVal; 
+        $lookVal=Lookup::where('id','=',$id)->value('code');
+        $lookCache[$id] = $lookVal;
+        return $lookVal;
+      }
+      return ''; 
     } 
 }
 
@@ -35,13 +38,17 @@ if(!function_exists('AclParnentByName'))
 {
     function AclparentByName($parentid=Null)
     {
-      $parentidname='';
-        if(!empty($parentid))
-        {
-        
-        $parentidname=Acl::where('id',$parentid)->value('title');
-        return $parentidname; 
+      static $aclNameCache = [];
+      if(!empty($parentid))
+      {
+        if (isset($aclNameCache[$parentid])) {
+            return $aclNameCache[$parentid];
         }
+        $parentidname=Acl::where('id',$parentid)->value('title');
+        $aclNameCache[$parentid] = $parentidname;
+        return $parentidname; 
+      }
+      return '';
     } 
 }
 
@@ -63,12 +70,17 @@ if(!function_exists('DesignationbyName'))
 {
     function DesignationbyName($Desid=Null)
     {
+        static $designationCache = [];
         if(!empty($Desid))
         {
-          $Desginationname='';
-        $Desginationname=Designation::where('id',$Desid)->value('name');
-        return $Desginationname; 
+          if (isset($designationCache[$Desid])) {
+              return $designationCache[$Desid];
+          }
+          $Desginationname=Designation::where('id',$Desid)->value('name');
+          $designationCache[$Desid] = $Desginationname;
+          return $Desginationname; 
         }
+        return '';
     } 
 }
 
@@ -83,14 +95,26 @@ if(!function_exists('DesignationbyName'))
 }
 
   function getUserPermission(){
-  $user_id				=	Auth::user()->id;
-  $path					=	Request()->path(); 
-  $admin_module_id		=	DB::table("acls")->where('path',$path)->pluck("id");
-  
-  $permissionData			=	DB::table("user_permission_actions")->leftJoin("acl_admin_actions","acl_admin_actions.id","=","user_permission_actions.admin_module_action_id")->where('user_permission_actions.user_id',$user_id)->where('user_permission_actions.admin_sub_module_id',$admin_module_id)->where('user_permission_actions.is_active',1)->where('acl_admin_actions.name','!=','List')->select("user_permission_actions.is_active","acl_admin_actions.type")->lists('acl_admin_actions.type','acl_admin_actions.type'); 
-  
-  return $permissionData;
-  die;
+    static $userPermissionCache = null;
+    if ($userPermissionCache !== null) {
+        return $userPermissionCache;
+    }
+
+    $user_id				=	Auth::user()->id;
+    $path					=	Request()->path(); 
+    $admin_module_id		=	DB::table("acls")->where('path',$path)->pluck("id");
+    
+    $userPermissionCache	=	DB::table("user_permission_actions")
+        ->leftJoin("acl_admin_actions","acl_admin_actions.id","=","user_permission_actions.admin_module_action_id")
+        ->where('user_permission_actions.user_id',$user_id)
+        ->where('user_permission_actions.admin_sub_module_id',$admin_module_id)
+        ->where('user_permission_actions.is_active',1)
+        ->where('acl_admin_actions.name','!=','List')
+        ->select("acl_admin_actions.type")
+        ->pluck('type', 'type')
+        ->toArray(); 
+    
+    return $userPermissionCache;
 }
 
   function sideBarNavigation($menus){
