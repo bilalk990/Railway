@@ -336,7 +336,10 @@ public function send_push_notification($deviceToken = "", $device_type = "", $me
 
     $body = json_encode(["message" => $notification]);
 
+    \Log::info('FCM: Sending push notification', ['token' => $deviceToken, 'title' => $notification_title]);
+
     $baerer_token = $this->getFirebaseAccessToken();
+    \Log::info('FCM: Access token retrieved successfully');
 
     $headers = [
         'Authorization: Bearer ' . $baerer_token,
@@ -352,10 +355,18 @@ public function send_push_notification($deviceToken = "", $device_type = "", $me
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     $result = curl_exec($ch);
+    
+    if (curl_errno($ch)) {
+        \Log::error('FCM: Curl error sending message', ['error' => curl_error($ch)]);
+    }
+
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
+    \Log::info('FCM: Send response', ['http_code' => $http_code, 'response' => $result]);
+
     $file = fopen("pushnotifications.txt", "a+");
-    fwrite($file, "\n\nRequest:\n" . $body . "\n\nResponse:\n" . $result . "\n\n");
+    fwrite($file, "\n\nTime: " . date('Y-m-d H:i:s') . "\nRequest:\n" . $body . "\n\nResponse:\n" . $result . "\n\n");
     fclose($file);
 
     return ["response" => $result, "request" => $body];
