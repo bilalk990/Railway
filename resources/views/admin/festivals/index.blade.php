@@ -20,10 +20,10 @@
 </div>
 
 <?php 
-$createPermission   = functionCheckPermission("UsersController@create");
-$viewPermission     = functionCheckPermission("UsersController@view");
-$deletePermission   = functionCheckPermission("UsersController@delete");
-$statusPermission   = functionCheckPermission("UsersController@changeStatus");
+$createPermission   = functionCheckPermission("FestivalController@create");
+$viewPermission     = functionCheckPermission("FestivalController@view");
+$deletePermission   = functionCheckPermission("FestivalController@delete");
+$statusPermission   = functionCheckPermission("FestivalController@changeStatus");
 ?>
 
 <div class="d-flex flex-column-fluid">

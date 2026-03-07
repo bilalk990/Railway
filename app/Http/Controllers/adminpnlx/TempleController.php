@@ -97,19 +97,27 @@ class TempleController extends Controller
             
             \Log::info('TempleController@Save: start', ['data' => $thisData]);
         
-            
-            $validator                    =   Validator::make(
-                
+            // ✅ Detailed File Logging
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                \Log::info('TempleController@Save: received image', [
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'extension' => $file->getClientOriginalExtension(),
+                ]);
+            }
+
+            $validator = Validator::make(
                 array(
-                    'name'              => $dafaultLanguageArray['name'],
-                    'url'               => "required",
-                    'image'             => 'required|mimes:jpeg,png,jpg,gif|max:10240',
-                    
+                    'name'  => $dafaultLanguageArray['name'] ?? '',
+                    'url'   => "required",
+                    'image' => $request->file('image'),
                 ),
                 array(
-                    'name'             => 'required',
-                      'url'               => "required",
-                    'image'             => 'required|mimes:jpeg,png,jpg,gif|max:10240',
+                    'name'  => 'required',
+                    'url'   => "required",
+                    'image' => 'required|mimes:jpeg,png,jpg,gif,webp|mimetypes:image/jpeg,image/png,image/jpg,image/gif,image/webp|max:20480',
                 )
             );
             
@@ -186,18 +194,31 @@ class TempleController extends Controller
             $default_language            =    Config('constants.DEFAULT_LANGUAGE.FOLDER_CODE');
             $language_code                 =   Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
             $dafaultLanguageArray        =    $thisData['data'][$language_code];
-            
-              $validator = Validator::make(
+            // ✅ Detailed File Logging
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                \Log::info('TempleController@update: received image', [
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'extension' => $file->getClientOriginalExtension(),
+                ]);
+            }
+
+            $validator = Validator::make(
                 array(
-                  'name'              => $dafaultLanguageArray['name'],
-                   'url'               => "required",
+                  'name'  => $dafaultLanguageArray['name'] ?? '',
+                  'url'   => "required",
+                  'image' => $request->file('image'),
                 ),
                 array(
-                   'name'             => 'required',
-                    'url'               => "required",
+                   'name'  => 'required',
+                   'url'   => "required",
+                   'image' => 'nullable|mimes:jpeg,png,jpg,gif,webp|mimetypes:image/jpeg,image/png,image/jpg,image/gif,image/webp|max:20480',
                 )
             );
             if ($validator->fails()) {
+                \Log::warning('TempleController@update: validation failed', ['errors' => $validator->errors()->toArray()]);
                 return redirect()->back()->withErrors($validator)->withInput();
             }else{
                  $temple                               =   Temple::where("id",$temple_id)->first();
@@ -205,8 +226,16 @@ class TempleController extends Controller
                 $temple->url                         =   $request->url;
                  
                if ($request->hasFile('image')) {
-                    $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
-                    $temple->image = $uploadedFileUrl;
+                    \Log::info('TempleController@update: uploading image to Cloudinary');
+                    try {
+                        $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                        $temple->image = $uploadedFileUrl;
+                        \Log::info('TempleController@update: image uploaded', ['url' => $uploadedFileUrl]);
+                    } catch (\Exception $e) {
+                        \Log::error('TempleController@update: Cloudinary upload failed', ['error' => $e->getMessage()]);
+                        Session()->flash('error', trans("Cloudinary upload failed: " . $e->getMessage()));
+                        return Redirect()->back()->withInput();
+                    }
                 }
                 $SavedResponse = $temple->save();
                 $lastId = $temple->id;

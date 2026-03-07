@@ -198,16 +198,16 @@
                                             <!-- 📝 Optional: Short Description -->
                                             <div class="col-xl-6">
                                                 <div class="form-group">
-                                                    <label for="{{ $language->id }}.short_dec">Short Description</label>
-                                                    <input type="text" name="data[{{ $language->id }}][short_dec]" class="form-control form-control-solid form-control-lg" value="{{ old('data.'.$language->id.'.short_dec') }}" placeholder="Enter short description">
+                                                    <label for="{{ $language->id }}.short_desc">Short Description</label>
+                                                    <input type="text" name="data[{{ $language->id }}][short_desc]" class="form-control form-control-solid form-control-lg" value="{{ old('data.'.$language->id.'.short_desc') }}" placeholder="Enter short description">
                                                 </div>
                                             </div>
 
                                             <!-- 📝 Optional: Long Description -->
                                             <div class="col-xl-12">
                                                 <div class="form-group">
-                                                    <label for="{{ $language->id }}.long_dec">Long Description</label>
-                                                    <textarea name="data[{{ $language->id }}][long_dec]" id="long_dec_{{ $language->id }}" class="form-control form-control-solid form-control-lg" rows="4" placeholder="Enter detailed description">{{ old('data.'.$language->id.'.long_dec') }}</textarea>
+                                                    <label for="{{ $language->id }}.long_desc">Long Description</label>
+                                                    <textarea name="data[{{ $language->id }}][long_desc]" id="long_desc_{{ $language->id }}" class="form-control form-control-solid form-control-lg" rows="4" placeholder="Enter detailed description">{{ old('data.'.$language->id.'.long_desc') }}</textarea>
                                                 </div>
                                             </div>
 

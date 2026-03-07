@@ -254,9 +254,20 @@ class FestivalController extends Controller
             $language_code        = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
             $dafaultLanguageArray = $thisData['data'][$language_code];
             
-            \Log::info('FestivalController@Save: start', ['data' => $thisData]);
-    
-            // ✅ Validation
+            // ✅ Detailed File Logging (helps debug specific file failures)
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                \Log::info('FestivalController@Save: received image', [
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(), // bytes
+                    'extension' => $file->getClientOriginalExtension(),
+                ]);
+            } else {
+                \Log::info('FestivalController@Save: no image in request');
+            }
+
+            // ✅ Validation (Increased max to 20MB and added mimetypes)
             $validator = Validator::make(
                 [
                     'name'  => $dafaultLanguageArray['name'] ?? '',
@@ -264,7 +275,7 @@ class FestivalController extends Controller
                 ],
                 [
                     'name'  => 'required',
-                    'image' => 'required|mimes:jpeg,png,jpg,gif|max:10240',
+                    'image' => 'nullable|mimes:jpeg,png,jpg,gif,webp|mimetypes:image/jpeg,image/png,image/jpg,image/gif,image/webp|max:20480',
                 ]
             );
     
@@ -277,11 +288,11 @@ class FestivalController extends Controller
                 // ✅ Base (non-language) fields
                 $festival->date             = $request->input('date');
                 $festival->name             = $dafaultLanguageArray['name'] ?? '';
-                $festival->short_dec        = $dafaultLanguageArray['short_dec'] ?? '';
-                $festival->long_dec         = $dafaultLanguageArray['long_dec'] ?? '';
+                $festival->short_dec        = $dafaultLanguageArray['short_desc'] ?? '';
+                $festival->long_dec         = $dafaultLanguageArray['long_desc'] ?? '';
                 $festival->regional_names   = $dafaultLanguageArray['regional_names'] ?? '';
                 $festival->temple_id        = $request->input('temple_id'); // if applicable
-                $festival->description      = $dafaultLanguageArray['long_dec'] ?? '';
+                $festival->description      = $dafaultLanguageArray['long_desc'] ?? '';
                   $festival->states           = $request->input('states');
     
                 // ✅ Optional base-level columns (add these columns in DB if needed)
@@ -318,8 +329,8 @@ class FestivalController extends Controller
                         $subObj->language_id       = $language_id;
                         $subObj->parent_id         = $lastId;
                         $subObj->name              = $value['name'] ?? '';
-                        $subObj->description       = $value['short_dec'] ?? '';
-                        $subObj->long_description  = $value['long_dec'] ?? '';
+                        $subObj->description       = $value['short_desc'] ?? '';
+                        $subObj->long_description  = $value['long_desc'] ?? '';
                         $subObj->regional_names    = $value['regional_names'] ?? '';
                         $subObj->states_celebrated = $value['states_celebrated'] ?? '';
                         $subObj->duration          = $value['duration'] ?? '';
@@ -501,13 +512,26 @@ class FestivalController extends Controller
     $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
     $dafaultLanguageArray = $thisData['data'][$language_code];
 
-    // ✅ Validation — only name required
+    // ✅ Detailed File Logging
+    if ($request->hasFile('image')) {
+        $file = $request->file('image');
+        \Log::info('FestivalController@update: received image', [
+            'original_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getMimeType(),
+            'size' => $file->getSize(),
+            'extension' => $file->getClientOriginalExtension(),
+        ]);
+    }
+
+    // ✅ Validation (Increased max to 20MB and added mimetypes)
     $validator = Validator::make(
         [
             'name'  => $dafaultLanguageArray['name'] ?? '',
+            'image' => $request->file('image'),
         ],
         [
             'name'  => 'required',
+            'image' => 'nullable|mimes:jpeg,png,jpg,gif,webp|mimetypes:image/jpeg,image/png,image/jpg,image/gif,image/webp|max:20480',
         ]
     );
 
@@ -526,14 +550,13 @@ class FestivalController extends Controller
     $festival->date                = $request->input('date');
     $festival->name                = $dafaultLanguageArray['name'] ?? '';
     $festival->regional_names      = $dafaultLanguageArray['regional_names'] ?? '';
-      $festival->description                 =   $dafaultLanguageArray['long_dec'] ?? '';
-        $festival->states              = $request->input('states'); 
-                if(!empty($request->temple_id)){
-                     $festival->temple_id   =   json_encode($request->input('temple_id'));
-                }
-                 $festival->short_dec                 =   $dafaultLanguageArray['short_dec'] ?? '';
-                 $festival->long_dec                 =   $dafaultLanguageArray['long_dec'] ?? '';
-    $festival->description         = $dafaultLanguageArray['long_dec'] ?? '';
+    $festival->description         = $dafaultLanguageArray['long_desc'] ?? '';
+    $festival->states              = $request->input('states'); 
+    if(!empty($request->temple_id)){
+        $festival->temple_id   =   json_encode($request->input('temple_id'));
+    }
+    $festival->short_dec           =   $dafaultLanguageArray['short_desc'] ?? '';
+    $festival->long_dec            =   $dafaultLanguageArray['long_desc'] ?? '';
     $festival->states_celebrated   = $dafaultLanguageArray['states_celebrated'] ?? '';
     $festival->duration            = $dafaultLanguageArray['duration'] ?? '';
     $festival->daily_significance  = $dafaultLanguageArray['daily_significance'] ?? '';
@@ -543,8 +566,16 @@ class FestivalController extends Controller
 
     // ✅ Handle image upload
     if ($request->hasFile('image')) {
-        $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
-        $festival->image = $uploadedFileUrl;
+        \Log::info('FestivalController@update: uploading image to Cloudinary');
+        try {
+            $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+            $festival->image = $uploadedFileUrl;
+            \Log::info('FestivalController@update: image uploaded', ['url' => $uploadedFileUrl]);
+        } catch (\Exception $e) {
+            \Log::error('FestivalController@update: Cloudinary upload failed', ['error' => $e->getMessage()]);
+            Session()->flash('error', trans("Cloudinary upload failed: " . $e->getMessage()));
+            return Redirect()->back()->withInput();
+        }
     }
 
     // ✅ Save main table
