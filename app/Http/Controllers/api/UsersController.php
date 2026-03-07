@@ -275,25 +275,18 @@ public function login(Request $request)
     {
         $userId = auth('api')->user()->id;
 
-        \Log::info('festivals API: fetching festivals');
         $festivals = Festival::with(['festivalDesc'])
             ->where('is_deleted', 0)
             ->get();
-        \Log::info('festivals API: festivals fetched', ['count' => $festivals->count()]);
 
-        \Log::info('festivals API: fetching reminders');
         $remindersByFestivalAndDate = Reminder::where('user_id', $userId)
             ->get()
             ->groupBy(function ($item) {
                 return $item->festival_id . '_' . $item->date;
             });
-        \Log::info('festivals API: reminders fetched');
 
-        \Log::info('festivals API: fetching faqs');
         $allFaqs = FestivalFaq::whereIn('festival_id', $festivals->pluck('id'))->get()->groupBy('festival_id');
-        \Log::info('festivals API: faqs fetched');
 
-        \Log::info('festivals API: fetching temples');
         $allTempleIds = [];
         foreach ($festivals as $festival) {
             $ids = json_decode($festival->temple_id, true);
@@ -303,7 +296,6 @@ public function login(Request $request)
         }
         $allTempleIds = array_unique(array_filter($allTempleIds));
         $allTemples = Temple::with('templeDesc')->whereIn('id', $allTempleIds)->where('is_deleted', 0)->get()->keyBy('id');
-        \Log::info('festivals API: temples fetched');
 
         $finalFestivals = collect();
 
@@ -348,7 +340,6 @@ public function login(Request $request)
             }
         }
 
-        \Log::info('festivals API: about to sort', ['total_clones' => $finalFestivals->count()]);
         // Sort the exploded entries by date
         $finalFestivals = $finalFestivals->sortBy(function ($festival) {
             try {
@@ -357,7 +348,6 @@ public function login(Request $request)
                 return \Carbon\Carbon::now()->addYears(10); 
             }
         })->values();
-        \Log::info('festivals API: done');
 
         return response()->json([
             "status" => "success",
