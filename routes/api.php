@@ -34,8 +34,18 @@ Route::middleware(['GuestApi'])->group(function () {
     Route::match(['get'], 'tiptap-list', [App\Http\Controllers\api\UsersController::class, 'tiptapIndex']);
 
     Route::post('/panchang', [App\Http\Controllers\api\UsersController::class, 'getPanchang']);
-    Route::match(['post'], 'social-login', [App\Http\Controllers\api\UsersController::class, 'socialLogin']);
+    Route::match(['get','post'], 'social-login', [App\Http\Controllers\api\UsersController::class, 'socialLogin']);
     Route::post('auth/facebook', [App\Http\Controllers\api\UsersController::class, 'facebookLogin']);
+    Route::get('test-passport', function() {
+        try {
+            $user = \App\Models\User::first();
+            if (!$user) return response()->json(['error' => 'No user found'], 404);
+            $token = $user->createToken('Test')->accessToken;
+            return response()->json(['token' => $token]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    });
 });
 
 
