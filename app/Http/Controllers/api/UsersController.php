@@ -961,7 +961,8 @@ public function getPanchang(Request $request)
             ], 200);
             
         } catch (\Exception $e) {
-            return response()->json([
+        \Log::error('tiptapIndex: crash', ['msg' => $e->getMessage()]);
+        return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch tiptaps',
                 'error' => $e->getMessage()
@@ -1033,6 +1034,7 @@ public function getPanchang(Request $request)
         }
 
         try {
+        \Log::info('socialLogin: starting process', ['provider' => $request->provider]);
             $socialId = $request->input('social_id');
             $provider = $request->input('provider');
             $email    = $request->input('email');
@@ -1046,15 +1048,17 @@ public function getPanchang(Request $request)
                 $user = User::where('email', $email)->first();
 
                 // Link the social_id to the existing email-based account
-                if ($user) {
-                    $user->social_id = $socialId;
-                    $user->save();
-                }
+            if ($user) {
+                \Log::info('socialLogin: linking social_id to existing email', ['email' => $email]);
+                $user->social_id = $socialId;
+                $user->save();
             }
+        }
 
             // Step 3: If still not found, create a new user
-            if (!$user) {
-                $user = new User();
+        if (!$user) {
+            \Log::info('socialLogin: creating new user', ['provider' => $provider]);
+            $user = new User();
                 $user->name        = $name ?: $provider . '_user';
                 $user->email       = $email ?: $socialId . '@' . $provider . '.social';
                 $user->social_id   = $socialId;
@@ -1086,7 +1090,6 @@ public function getPanchang(Request $request)
                     'user_id'      => $user->id,
                     'device_type'  => $request->input('device_type', ''),
                     'device_id'    => $request->device_id,
-                    'device_token' => $request->input('device_token', $request->device_id),
                 ]);
             }
 
@@ -1107,7 +1110,9 @@ public function getPanchang(Request $request)
             ], 200);
 
         } catch (\Exception $e) {
-            return response()->json([
+            \Log::info('socialLogin: success', ['user_id' => $user->id]);
+
+        return response()->json([
                 'status'  => 'error',
                 'message' => 'Social login failed',
                 'error'   => $e->getMessage(),
@@ -1143,94 +1148,98 @@ public function getPanchang(Request $request)
         }
 
         try {
-            // Step 1: Verify the token with Facebook Graph API
-            $fbToken  = $request->input('facebook_access_token');
-            $graphUrl = 'https://graph.facebook.com/me?fields=id,name,email&access_token=' . urlencode($fbToken);
+        \Log::info('facebookLogin: starting process');
+        // Step 1: Verify the token with Facebook Graph API
+        $fbToken  = $request->input('facebook_access_token');
+        $graphUrl = 'https://graph.facebook.com/me?fields=id,name,email&access_token=' . urlencode($fbToken);
 
-            $client       = new Client();
-            $graphResponse = $client->get($graphUrl, ['http_errors' => false]);
-            $fbData        = json_decode($graphResponse->getBody()->getContents(), true);
+        $client       = new Client();
+        $graphResponse = $client->get($graphUrl, ['http_errors' => false]);
+        $fbData        = json_decode($graphResponse->getBody()->getContents(), true);
 
-            // Check if Graph API returned an error
-            if (isset($fbData['error']) || !isset($fbData['id'])) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Invalid Facebook access token. Please try again.',
-                    'detail'  => $fbData['error']['message'] ?? 'Unknown error',
-                ], 401);
-            }
+        \Log::info('facebookLogin: graph data received', ['id' => $fbData['id'] ?? 'none']);
 
-            $socialId = $fbData['id'];
-            $name     = $fbData['name'] ?? '';
-            $email    = $fbData['email'] ?? null;
-
-            // Step 2: Find user by social_id
-            $user = User::where('social_id', $socialId)->first();
-
-            // Step 3: If not found by social_id, try by email
-            if (!$user && $email) {
-                $user = User::where('email', $email)->first();
-                if ($user) {
-                    $user->social_id = $socialId;
-                    $user->save();
-                }
-            }
-
-            // Step 4: If still not found, return redirect_signup so app collects profile info
-            if (!$user) {
-                return response()->json([
-                    'status'   => 'success',
-                    'redirect' => 'redirect_signup',
-                    'message'  => 'Please complete your profile to continue.',
-                    'user'     => [
-                        'name'      => $name,
-                        'email'     => $email,
-                        'social_id' => $socialId,
-                    ],
-                ], 200);
-            }
-
-            // Step 5: Check if account is active
-            if ($user->is_active == 0 || $user->is_deleted == 1) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Your account has been deactivated. Please contact admin.',
-                ], 403);
-            }
-
-            // Step 6: Register device token for push notifications
-            if ($request->device_id) {
-                UserDeviceToken::where('device_id', $request->device_id)->delete();
-                UserDeviceToken::create([
-                    'user_id'     => $user->id,
-                    'device_type' => $request->input('device_type', ''),
-                    'device_id'   => $request->device_id,
-                ]);
-            }
-
-            // Step 7: Generate Passport access token
-            $token = $user->createToken('Facebook Token')->accessToken;
-
-            // Step 8: Create notification settings if not exists
-            NotificationSetting::firstOrCreate(
-                ['user_id' => $user->id],
-                ['festival_notification' => 1, 'push_notification' => json_encode(['festival_notification' => 1])]
-            );
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Facebook login successful',
-                'token'   => $token,
-                'user'    => $user,
-            ], 200);
-
-        } catch (\Exception $e) {
+        // Check if Graph API returned an error
+        if (isset($fbData['error']) || !isset($fbData['id'])) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Facebook login failed',
-                'error'   => $e->getMessage(),
-            ], 500);
+                'message' => 'Invalid Facebook access token. Please try again.',
+                'detail'  => $fbData['error']['message'] ?? 'Unknown error',
+            ], 401);
         }
+
+        $socialId = $fbData['id'];
+        $name     = $fbData['name'] ?? '';
+        $email    = $fbData['email'] ?? null;
+
+        // Step 2: Find user by social_id
+        $user = User::where('social_id', $socialId)->first();
+
+        // Step 3: If not found by social_id, try by email
+        if (!$user && $email) {
+            $user = User::where('email', $email)->first();
+            if ($user) {
+                $user->social_id = $socialId;
+                $user->save();
+            }
+        }
+
+        // Step 4: If still not found, CREATE the user (Seamless flow)
+        if (!$user) {
+            \Log::info('facebookLogin: creating new user', ['social_id' => $socialId]);
+            $user = new User();
+            $user->name        = $name ?: 'facebook_user';
+            $user->email       = $email ?: $socialId . '@facebook.social';
+            $user->social_id   = $socialId;
+            $user->is_verified = 1;
+            $user->is_active   = 1;
+            $user->save();
+        }
+
+        // Step 5: Check if account is active
+        if ($user->is_active == 0 || $user->is_deleted == 1) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Your account has been deactivated. Please contact admin.',
+            ], 403);
+        }
+
+        // Step 6: Register device token
+        if ($request->device_id) {
+            UserDeviceToken::where('device_id', $request->device_id)->delete();
+            UserDeviceToken::create([
+                'user_id'     => $user->id,
+                'device_type' => $request->input('device_type', ''),
+                'device_id'   => $request->device_id,
+            ]);
+        }
+
+        // Step 7: Generate Passport access token
+        $token = $user->createToken('Facebook Token')->accessToken;
+
+        // Step 8: Create notification settings if not exists
+        NotificationSetting::firstOrCreate(
+            ['user_id' => $user->id],
+            ['festival_notification' => 1, 'push_notification' => json_encode(['festival_notification' => 1])]
+        );
+
+        \Log::info('facebookLogin: success', ['user_id' => $user->id]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Facebook login successful',
+            'token'   => $token,
+            'user'    => $user,
+        ], 200);
+
+    } catch (\Exception $e) {
+        \Log::error('facebookLogin: crash', ['msg' => $e->getMessage()]);
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'Facebook login failed',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
     }
 
 }
