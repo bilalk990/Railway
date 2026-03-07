@@ -80,7 +80,9 @@ class FestivalController extends Controller
         $query_string = http_build_query($complete_string);
         $results->appends($inputGet);
 
-        return View("admin.$this->model.index", compact('results', 'searchVariable', 'sortBy', 'order', 'query_string'));
+        $statesList = \App\Models\State::pluck('name', 'id')->toArray();
+
+        return View("admin.$this->model.index", compact('results', 'searchVariable', 'sortBy', 'order', 'query_string', 'statesList'));
     }
 
     public function create()
