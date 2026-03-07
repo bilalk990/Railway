@@ -87,7 +87,7 @@ class FestivalController extends Controller
     {
         $languages = Language::where('is_active', 1)->get();
         $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-        $states = State::where('is_active', 1)->get();
+        $states = State::get();
         $temples = Temple::where('is_active', 1)->where('is_deleted', 0)->get();
         return View("admin.$this->model.add", compact('languages', 'language_code', 'states', 'temples'));
     }
@@ -210,7 +210,7 @@ class FestivalController extends Controller
             }
             $languages = Language::where('is_active', 1)->get();
             $language_code = Config('constants.DEFAULT_LANGUAGE.LANGUAGE_CODE');
-            $states = State::where('is_active', 1)->get();
+            $states = State::get();
             $temples = Temple::where('is_active', 1)->where('is_deleted', 0)->get();
             return View("admin.$this->model.edit", compact('multiLanguage', 'cmsdescriptiondetl', 'festivalDetails', 'languages', 'language_code', 'states', 'temples'));
         } else {
