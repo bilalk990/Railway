@@ -256,7 +256,7 @@ class Controller extends BaseController
     }
 
     function getFirebaseAccessToken() {
-        $keyFilePath = public_path('remyndnow-8ce2fb96e90f.json');
+        $keyFilePath = public_path('remyndnow-b55ae-e8b4296e2c4e.json');
         if (!file_exists($keyFilePath)) {
             \Log::error('FCM: Service account file not found at ' . $keyFilePath);
             throw new \Exception('Service account file not found');
@@ -313,7 +313,7 @@ public function send_push_notification($deviceToken = "", $device_type = "", $me
     ];
 
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, 'https://fcm.googleapis.com/v1/projects/remyndnow/messages:send');
+    curl_setopt($ch, CURLOPT_URL, 'https://fcm.googleapis.com/v1/projects/remyndnow-b55ae/messages:send');
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
