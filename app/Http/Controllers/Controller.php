@@ -258,7 +258,7 @@ class Controller extends BaseController
     function getFirebaseAccessToken() {
         $keyFilePath = public_path('remyndnow-b55ae-e8b4296e2c4e.json');
         if (!file_exists($keyFilePath)) {
-            \Log::error('FCM: Service account file not found at ' . $keyFilePath);
+            \Log::error('FCM Error: Service account file not found at ' . $keyFilePath);
             throw new \Exception('Service account file not found');
         }
 
@@ -267,11 +267,15 @@ class Controller extends BaseController
             $keyData = json_decode($jsonContent, true);
             
             if (!$keyData || !isset($keyData['private_key'])) {
-                \Log::error('FCM: Invalid JSON or missing private_key in ' . $keyFilePath);
+                \Log::error('FCM Error: Invalid JSON or missing private_key in ' . $keyFilePath);
                 throw new \Exception('Invalid or corrupt service account key');
             }
 
-            \Log::info('FCM: Attempting to fetch access token for client: ' . ($keyData['client_email'] ?? 'unknown'));
+            // Repairing private key formatting
+            $keyData['private_key'] = $this->normalizePrivateKey($keyData['private_key']);
+
+            \Log::info('FCM Info: Token fetch attempt for client: ' . ($keyData['client_email'] ?? 'unknown'));
+            \Log::info('FCM Info: Server Time: ' . date('Y-m-d H:i:s') . ' UTC: ' . gmdate('Y-m-d H:i:s'));
 
             $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
                 'https://www.googleapis.com/auth/firebase.messaging',
@@ -281,21 +285,40 @@ class Controller extends BaseController
             $token = $credentials->fetchAuthToken();
             
             if (isset($token['access_token'])) {
-                \Log::info('FCM: Access token retrieved successfully');
+                \Log::info('FCM Success: Access token retrieved');
                 return $token['access_token'];
             } else {
-                \Log::error('FCM: Failed to fetch access token', ['response' => $token]);
+                \Log::error('FCM Error: Token fetch failed', ['response' => $token]);
                 throw new \Exception('Failed to fetch access token from Google: ' . json_encode($token));
             }
             
         } catch (\Exception $e) {
-            \Log::error('FCM: Exception during token fetch', [
-                'message' => $e->getMessage(),
+            \Log::error('FCM Exception: ' . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ]);
             throw $e;
         }
+    }
+
+    private function normalizePrivateKey($key) {
+        // Ensure literal \n are replaced with real newlines
+        $key = str_replace('\n', "\n", $key);
+        
+        // Remove whitespace and check headers
+        $key = trim($key);
+        if (strpos($key, '-----BEGIN PRIVATE KEY-----') === false) {
+            $key = "-----BEGIN PRIVATE KEY-----\n" . $key;
+        }
+        if (strpos($key, '-----END PRIVATE KEY-----') === false) {
+            $key = $key . "\n-----END PRIVATE KEY-----";
+        }
+        
+        // Ensure correct PEM line formatting if mangled
+        $inner = str_replace(["-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----", "\n", "\r", " "], "", $key);
+        $key = "-----BEGIN PRIVATE KEY-----\n" . chunk_split($inner, 64, "\n") . "-----END PRIVATE KEY-----";
+        
+        return $key;
     }
 
 public function send_push_notification($deviceToken = "", $device_type = "", $message = "", $notification_title = "", $notification_type = "", $data = [])
