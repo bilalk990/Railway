@@ -263,23 +263,37 @@ class Controller extends BaseController
         }
 
         try {
+            $jsonContent = file_get_contents($keyFilePath);
+            $keyData = json_decode($jsonContent, true);
+            
+            if (!$keyData || !isset($keyData['private_key'])) {
+                \Log::error('FCM: Invalid JSON or missing private_key in ' . $keyFilePath);
+                throw new \Exception('Invalid or corrupt service account key');
+            }
+
+            \Log::info('FCM: Attempting to fetch access token for client: ' . ($keyData['client_email'] ?? 'unknown'));
+
             $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
                 'https://www.googleapis.com/auth/firebase.messaging',
-                $keyFilePath
+                $keyData
             );
             
-            // fetchAuthToken will handle the API request and clock drift automatically
             $token = $credentials->fetchAuthToken();
             
             if (isset($token['access_token'])) {
+                \Log::info('FCM: Access token retrieved successfully');
                 return $token['access_token'];
             } else {
                 \Log::error('FCM: Failed to fetch access token', ['response' => $token]);
-                throw new \Exception('Failed to fetch access token from Google.');
+                throw new \Exception('Failed to fetch access token from Google: ' . json_encode($token));
             }
             
         } catch (\Exception $e) {
-            \Log::error('FCM: Exception during token fetch', ['message' => $e->getMessage()]);
+            \Log::error('FCM: Exception during token fetch', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
             throw $e;
         }
     }
