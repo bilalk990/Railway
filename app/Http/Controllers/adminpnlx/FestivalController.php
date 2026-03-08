@@ -454,9 +454,72 @@ class FestivalController extends Controller
     public function runReminders()
     {
         try {
-            \Artisan::call('notifications:daily-festival');
-            $output = \Artisan::output();
-            return "<h1>Reminder Process Triggered</h1><pre>" . $output . "</pre><p>If you set a reminder for 'Today' at a time that has already passed, the notification should have been sent to your device.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
+            // Aggressive mode: fetch all unsent reminders regardless of date/time
+            $reminders = \App\Models\Reminder::with(['user', 'festival'])
+                ->where('sent', 0)
+                ->whereHas('user', function($query) {
+                    $query->where('is_active', 1)->where('is_deleted', 0);
+                })
+                ->whereHas('festival', function($query) {
+                    $query->where('is_active', 1);
+                })
+                ->get();
+
+            if ($reminders->isEmpty()) {
+                return "<h1>No pending reminders found</h1><p>Sabhi reminders pehlay hi bhejay ja chukay hain (sent=1). Naya reminder lagao app mein phir check karo.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
+            }
+
+            $sentCount = 0;
+            foreach ($reminders as $reminder) {
+                $user = $reminder->user;
+                $festival = $reminder->festival;
+
+                // Get user's device tokens
+                $deviceTokens = \App\Models\UserDeviceToken::where('user_id', $user->id)
+                    ->whereNotNull('device_id')
+                    ->where('device_id', '!=', '')
+                    ->get();
+
+                if ($deviceTokens->isEmpty()) {
+                    \Log::info("runReminders Demo: No device token for user " . $user->id);
+                    continue;
+                }
+
+                $title = "⏰ Test Reminder: " . ($festival->name ?? 'Festival');
+                $body = "Your reminder for " . ($festival->name ?? 'Festival') . " is here! (Demo Mode)";
+
+                // Store in DB
+                \App\Models\Notification::create([
+                    'user_id' => $user->id,
+                    'title' => $title,
+                    'description' => $body,
+                    'is_read' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                foreach ($deviceTokens as $deviceToken) {
+                    $this->send_push_notification(
+                        $deviceToken->device_id,
+                        '', 
+                        $body,
+                        $title,
+                        'reminder',
+                        [
+                            'festival_id' => $festival->id,
+                            'reminder_id' => $reminder->id,
+                            'type' => 'reminder',
+                            'is_demo' => true
+                        ]
+                    );
+                }
+
+                $reminder->sent = 1;
+                $reminder->save();
+                $sentCount++;
+            }
+
+            return "<h1>Demo Success!</h1><p>Sent $sentCount reminders immediately (Ignoring date/time constraints).</p><p>Check your phone now!</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
         } catch (\Exception $e) {
             return "<h1>Error running reminders</h1><p>" . $e->getMessage() . "</p>";
         }
