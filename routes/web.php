@@ -227,6 +227,7 @@ Route::controller(FaqController::class)->group(function () {
 
         // DEBUG: Route to check PHP limits and test Cloudinary
         Route::get('/debug-upload', [App\Http\Controllers\adminpnlx\FestivalController::class, 'debugUpload'])->name('debug-upload');
+        Route::get('/test-reminders', [App\Http\Controllers\adminpnlx\FestivalController::class, 'runReminders'])->name('test-reminders');
     });
 });
 

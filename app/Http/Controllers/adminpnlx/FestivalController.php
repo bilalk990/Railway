@@ -450,4 +450,15 @@ class FestivalController extends Controller
         }
         exit;
     }
+
+    public function runReminders()
+    {
+        try {
+            \Artisan::call('notifications:daily-festival');
+            $output = \Artisan::output();
+            return "<h1>Reminder Process Triggered</h1><pre>" . $output . "</pre><p>If you set a reminder for 'Today' at a time that has already passed, the notification should have been sent to your device.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
+        } catch (\Exception $e) {
+            return "<h1>Error running reminders</h1><p>" . $e->getMessage() . "</p>";
+        }
+    }
 }
