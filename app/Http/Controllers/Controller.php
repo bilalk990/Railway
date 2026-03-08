@@ -274,7 +274,7 @@ class Controller extends BaseController
         'iss' => $key['client_email'],
         'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
         'aud' => 'https://oauth2.googleapis.com/token',
-        'iat' => $now,
+        'iat' => $now - 60, // Set back 1 minute to avoid 'invalid_grant' clock drift errors
         'exp' => $now + 3600,
     ];
 
