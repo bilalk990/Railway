@@ -256,7 +256,7 @@ class Controller extends BaseController
     }
 
     function getFirebaseAccessToken() {
-        $keyFilePath = public_path('remyndnow-b55ae-e8b4296e2c4e.json');
+        $keyFilePath = public_path('remyndnow-8ce2fb96e90f.json');
         if (!file_exists($keyFilePath)) {
             \Log::error('FCM Error: Service account file not found at ' . $keyFilePath);
             throw new \Exception('Service account file not found');
