@@ -78,6 +78,22 @@ Route::prefix('adminpnlx')->group(function () {
         return redirect()->route('dashboard');
     });
 
+    Route::get('/test-fcm-auth', function() {
+        $fAdmin = glob(public_path('remindnownew-firebase-adminsdk-*.json'));
+        if (empty($fAdmin)) return "No JSON found";
+        $json = file_get_contents($fAdmin[0]);
+        $keyData = json_decode($json, true);
+        
+        try {
+            $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+            $creds = new \Google\Auth\Credentials\ServiceAccountCredentials($scopes, $keyData);
+            $token = $creds->fetchAuthToken();
+            return "SUCCESS! Project: " . $keyData['project_id'];
+        } catch (\Exception $e) {
+            return "ERROR: " . $e->getMessage();
+        }
+    });
+
     Route::middleware(['AuthAdmin'])->group(function () {
         Route::post('festivals/mark-popular', [App\Http\Controllers\adminpnlx\FestivalController::class, 'markPopular'])->name('festivals.markPopular');
          Route::resource('tiptaps', App\Http\Controllers\adminpnlx\TiptapController::class);
