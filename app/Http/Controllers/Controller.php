@@ -255,27 +255,40 @@ class Controller extends BaseController
         return $ext;
     }
 
-    function getFirebaseAccessToken() {
+    function getFirebaseAccessToken(&$projectId = null) {
         $keyFilePath = public_path('remyndnow-8ce2fb96e90f.json');
+        
+        // Potential workaround: check if a newer key exists
+        $files = glob(public_path('*-firebase-adminsdk-*.json'));
+        if (!empty($files)) {
+            $keyFilePath = $files[0];
+        } else {
+            $files = glob(public_path('remyndnow-b55ae-*.json'));
+            if (!empty($files)) {
+                $keyFilePath = $files[0];
+            }
+        }
+
         if (!file_exists($keyFilePath)) {
             \Log::error('FCM Error: Service account file not found at ' . $keyFilePath);
-            throw new \Exception('Service account file not found');
+            throw new \Exception('Service account file not found at ' . $keyFilePath);
         }
 
         try {
             $jsonContent = file_get_contents($keyFilePath);
             $keyData = json_decode($jsonContent, true);
             
-            if (!$keyData || !isset($keyData['private_key'])) {
-                \Log::error('FCM Error: Invalid JSON or missing private_key in ' . $keyFilePath);
-                throw new \Exception('Invalid or corrupt service account key');
+            if (!$keyData || !isset($keyData['private_key']) || !isset($keyData['project_id'])) {
+                \Log::error('FCM Error: Invalid JSON or missing required fields in ' . $keyFilePath);
+                throw new \Exception('Invalid or corrupt service account key: missing private_key or project_id');
             }
+
+            $projectId = $keyData['project_id']; // Extract project ID for the URL
 
             // Repairing private key formatting
             $keyData['private_key'] = $this->normalizePrivateKey($keyData['private_key']);
 
-            \Log::info('FCM Info: Token fetch attempt for client: ' . ($keyData['client_email'] ?? 'unknown'));
-            \Log::info('FCM Info: Server Time: ' . date('Y-m-d H:i:s') . ' UTC: ' . gmdate('Y-m-d H:i:s'));
+            \Log::info('FCM Info: Token fetch attempt for project: ' . $projectId . ' (client: ' . ($keyData['client_email'] ?? 'unknown') . ')');
 
             $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
                 'https://www.googleapis.com/auth/firebase.messaging',
@@ -285,7 +298,6 @@ class Controller extends BaseController
             $token = $credentials->fetchAuthToken();
             
             if (isset($token['access_token'])) {
-                \Log::info('FCM Success: Access token retrieved');
                 return $token['access_token'];
             } else {
                 \Log::error('FCM Error: Token fetch failed', ['response' => $token]);
@@ -293,10 +305,7 @@ class Controller extends BaseController
             }
             
         } catch (\Exception $e) {
-            \Log::error('FCM Exception: ' . $e->getMessage(), [
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
+            \Log::error('FCM Exception: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -323,55 +332,66 @@ class Controller extends BaseController
 
 public function send_push_notification($deviceToken = "", $device_type = "", $message = "", $notification_title = "", $notification_type = "", $data = [])
 {
-    $notification = [
-        "notification" => [
-            "title" => $notification_title,
-            "body" => $message,
-        ],
-        "token" => $deviceToken,
-    ];
+    try {
+        $notification = [
+            "notification" => [
+                "title" => $notification_title,
+                "body" => $message,
+            ],
+            "token" => $deviceToken,
+        ];
 
-    if (!empty($data)) {
-        $notification["data"] = array_map('strval', $data); 
-        $notification["data"]["type"] = $notification_type; 
+        if (!empty($data)) {
+            $notification["data"] = array_map('strval', $data); 
+            $notification["data"]["type"] = $notification_type; 
+        }
+
+        $body = json_encode(["message" => $notification]);
+
+        \Log::info('FCM: Sending push notification', ['token' => $deviceToken, 'title' => $notification_title]);
+
+        $projectId = null;
+        $baerer_token = $this->getFirebaseAccessToken($projectId);
+        
+        if (!$projectId) {
+            throw new \Exception("Could not determine Project ID from service account key.");
+        }
+
+        $headers = [
+            'Authorization: Bearer ' . $baerer_token,
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ];
+
+        $fcmUrl = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $fcmUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        $result = curl_exec($ch);
+        
+        if (curl_errno($ch)) {
+            \Log::error('FCM: Curl error', ['error' => curl_error($ch)]);
+        }
+
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        \Log::info('FCM: Send response', ['project' => $projectId, 'http_code' => $http_code, 'response' => $result]);
+
+        $file = fopen(base_path("pushnotifications.txt"), "a+");
+        fwrite($file, "\n\nTime: " . date('Y-m-d H:i:s') . "\nTarget Project: " . $projectId . "\nRequest:\n" . $body . "\n\nResponse:\n" . $result . "\n\n");
+        fclose($file);
+
+        return ["response" => $result, "request" => $body];
+    } catch (\Exception $e) {
+        \Log::error('FCM: Fatal error in send_push_notification: ' . $e->getMessage());
+        return ["response" => json_encode(["error" => $e->getMessage()]), "request" => ""];
     }
-
-    $body = json_encode(["message" => $notification]);
-
-    \Log::info('FCM: Sending push notification', ['token' => $deviceToken, 'title' => $notification_title]);
-
-    $baerer_token = $this->getFirebaseAccessToken();
-    \Log::info('FCM: Access token retrieved successfully');
-
-    $headers = [
-        'Authorization: Bearer ' . $baerer_token,
-        'Content-Type: application/json',
-        'Accept: application/json',
-    ];
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, 'https://fcm.googleapis.com/v1/projects/remyndnow-b55ae/messages:send');
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-    $result = curl_exec($ch);
-    
-    if (curl_errno($ch)) {
-        \Log::error('FCM: Curl error sending message', ['error' => curl_error($ch)]);
-    }
-
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    \Log::info('FCM: Send response', ['http_code' => $http_code, 'response' => $result]);
-
-    $file = fopen("pushnotifications.txt", "a+");
-    fwrite($file, "\n\nTime: " . date('Y-m-d H:i:s') . "\nRequest:\n" . $body . "\n\nResponse:\n" . $result . "\n\n");
-    fclose($file);
-
-    return ["response" => $result, "request" => $body];
 }
 
 
