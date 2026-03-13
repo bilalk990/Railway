@@ -497,8 +497,9 @@ class FestivalController extends Controller
                 'updated_at' => now(),
             ]);
 
+            $allSuccess = true;
             foreach ($deviceTokens as $deviceToken) {
-                $this->send_push_notification(
+                $pushResult = $this->send_push_notification(
                     $deviceToken->device_id,
                     '', 
                     $body,
@@ -510,12 +511,26 @@ class FestivalController extends Controller
                         'type' => 'reminder',
                     ]
                 );
+                
+                // Check if result contains error
+                if (isset($pushResult['response']) && strpos($pushResult['response'], '"error"') !== false) {
+                    $allSuccess = false;
+                    \Log::error("runReminders: Push failed for token {$deviceToken->device_id}: " . $pushResult['response']);
+                }
             }
 
-            // Mark as sent
-            $reminder->sent = 1;
-            $reminder->save();
-            $sentCount++;
+            // Only mark as sent if at least one token worked or if there was no catastrophic error
+            if ($allSuccess) {
+                $reminder->sent = 1;
+                $reminder->save();
+                $sentCount++;
+            } else {
+                \Log::warning("runReminders: Failed to send for reminder ID {$reminder->id}");
+            }
+        }
+
+        if ($sentCount == 0) {
+            return "<h1>Push Failed</h1><p>Failed to send notifications. This is usually due to an Invalid Firebase Key (Invalid JWT Signature). Please generate a new service account key in Firebase and upload it.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
         }
 
         return "<h1>Success!</h1><p>Sent $sentCount reminders immediately.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
