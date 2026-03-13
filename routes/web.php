@@ -79,18 +79,24 @@ Route::prefix('adminpnlx')->group(function () {
     });
 
     Route::get('/test-fcm-auth', function() {
-        $fAdmin = glob(public_path('remindnownew-firebase-adminsdk-*.json'));
-        if (empty($fAdmin)) return "No JSON found";
-        $json = file_get_contents($fAdmin[0]);
+        $filename = 'remindnownew-firebase-adminsdk-fbsvc-3eecd39c76.json';
+        $path = public_path($filename);
+        if (!file_exists($path)) {
+            // Check if ANY json exists
+            $all = glob(public_path('*.json'));
+            return "File $filename NOT FOUND. Found instead: " . implode(', ', array_map('basename', $all));
+        }
+        
+        $json = file_get_contents($path);
         $keyData = json_decode($json, true);
         
         try {
             $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
             $creds = new \Google\Auth\Credentials\ServiceAccountCredentials($scopes, $keyData);
             $token = $creds->fetchAuthToken();
-            return "SUCCESS! Project: " . $keyData['project_id'];
+            return "SUCCESS! Project: " . $keyData['project_id'] . " | Key ID: " . substr($keyData['private_key_id'], 0, 10);
         } catch (\Exception $e) {
-            return "ERROR: " . $e->getMessage();
+            return "ERROR: " . $e->getMessage() . " | Looking at file: $filename";
         }
     });
 
