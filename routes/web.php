@@ -121,7 +121,7 @@ Route::prefix('adminpnlx')->group(function () {
         return "<pre>" . file_get_contents($path) . "</pre>";
     });
 
-    Route::get('/test-reminders', [App\Http\Controllers\adminpnlx\FestivalController::class, 'runReminders'])->name('test-reminders');
+    Route::get('/test-push-direct', [App\Http\Controllers\adminpnlx\FestivalController::class, 'testPushDirect']);
 
     Route::middleware(['AuthAdmin'])->group(function () {
         Route::post('festivals/mark-popular', [App\Http\Controllers\adminpnlx\FestivalController::class, 'markPopular'])->name('festivals.markPopular');

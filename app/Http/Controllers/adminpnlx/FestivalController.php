@@ -535,4 +535,17 @@ class FestivalController extends Controller
 
         return "<h1>Success!</h1><p>Sent $sentCount reminders immediately.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
     }
+
+    public function testPushDirect() {
+        $tokenData = \DB::table('user_device_tokens')->first();
+        if (!$tokenData) return "No device tokens found in database.";
+        
+        $token = $tokenData->device_id;
+        $title = "Test Direct";
+        $body = "Checking raw FCM response";
+        
+        $result = $this->sendNotification($token, $title, $body);
+        
+        return "<h3>Testing Token: $token</h3><pre>" . print_r($result, true) . "</pre>";
+    }
 }
