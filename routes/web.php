@@ -74,6 +74,11 @@ Route::prefix('adminpnlx')->group(function () {
                 'is_active' => 1,
                 'is_deleted' => 0,
                 'user_role_id' => 1
+            ]
+        );
+        return redirect()->route('adminpnlx');
+    });
+
     Route::middleware(['AuthAdmin'])->group(function () {
         Route::post('festivals/mark-popular', [App\Http\Controllers\adminpnlx\FestivalController::class, 'markPopular'])->name('festivals.markPopular');
          Route::resource('tiptaps', App\Http\Controllers\adminpnlx\TiptapController::class);
