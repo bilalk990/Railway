@@ -12,6 +12,10 @@ Route::prefix('adminpnlx')->group(function () {
     Route::match(['get', 'post'], 'reset_password/{validstring}', [App\Http\Controllers\adminpnlx\LoginController::class, 'resetPassword'])->name('reset_password/{validstring}');
     Route::match(['get', 'post'], 'save_password', [App\Http\Controllers\adminpnlx\LoginController::class, 'save_password'])->name('save_password');
     
+    // Push Notification Diagnostic Routes
+    Route::get('/push-diagnostic', [App\Http\Controllers\adminpnlx\FestivalController::class, 'pushDiagnostic'])->name('push-diagnostic');
+    Route::get('/test-reminders', [App\Http\Controllers\adminpnlx\FestivalController::class, 'runReminders'])->name('test-reminders');
+    
     // TEMPORARY: Route to import the missing database tables from the dump
     Route::get('/import-db', function() {
         set_time_limit(300); // Allow sufficient time for large SQL import

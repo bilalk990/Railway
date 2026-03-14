@@ -536,5 +536,71 @@ class FestivalController extends Controller
         return "<h1>Success!</h1><p>Sent $sentCount reminders immediately.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
     }
 
+    public function pushDiagnostic()
+    {
+        $envCredentials = env('FIREBASE_CREDENTIALS');
+        $status = "Unknown";
+        $project = "N/A";
+        $details = "";
+
+        if (!empty($envCredentials)) {
+            $keyData = json_decode($envCredentials, true);
+            if ($keyData) {
+                $project = $keyData['project_id'] ?? 'N/A';
+                try {
+                    $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+                    $creds = new \Google\Auth\Credentials\ServiceAccountCredentials($scopes, $keyData);
+                    $token = $creds->fetchAuthToken();
+                    $status = "ACTIVE & CONNECTED";
+                    $details = "Successfully retrieved access token from Google APIs for project <b>$project</b>.";
+                } catch (\Exception $e) {
+                    $status = "AUTHENTICATION ERROR";
+                    $details = $e->getMessage();
+                }
+            } else {
+                $status = "CONFIG ERROR";
+                $details = "Invalid JSON structure in environment variable.";
+            }
+        } else {
+            $status = "MISSING CONFIG";
+            $details = "FIREBASE_CREDENTIALS environment variable is not set.";
+        }
+
+        return "
+        <div style='font-family: sans-serif; max-width: 650px; margin: 50px auto; padding: 30px; border: 1px solid #ddd; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; background: #fff;'>
+            <img src='https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/firebase_28dp.png' width='40' style='margin-bottom: 10px;'>
+            <h2 style='color: #1a73e8; margin-top: 0;'>Push Notification System Audit</h2>
+            <p style='color: #666;'>Verification tool for Firebase Cloud Messaging Integration</p>
+            <hr style='border: 0; border-top: 1px solid #eee; margin: 25px 0;'>
+            
+            <div style='display: flex; justify-content: space-around; margin-bottom: 25px;'>
+                <div style='text-align: left;'>
+                    <span style='font-size: 12px; color: #888; text-transform: uppercase;'>Current Project</span><br>
+                    <strong style='font-size: 18px;'>$project</strong>
+                </div>
+                <div style='text-align: left;'>
+                    <span style='font-size: 12px; color: #888; text-transform: uppercase;'>Status</span><br>
+                    <span style='color: ".($status == "ACTIVE & CONNECTED" ? "#28a745" : "#dc3545")."; font-weight: bold; font-size: 18px;'>$status</span>
+                </div>
+            </div>
+
+            <div style='background: " . ($status == "ACTIVE & CONNECTED" ? "#e8f5e9" : "#fff3e0") . "; padding: 20px; border-radius: 8px; border-left: 6px solid " . ($status == "ACTIVE & CONNECTED" ? "#28a745" : "#ff9800") . "; font-size: 14px; text-align: left; margin-bottom: 30px;'>
+                <strong style='color: #333;'>Engine Details:</strong><br>
+                <p style='margin: 10px 0 0 0; color: #444; line-height: 1.5;'>$details</p>
+            </div>
+
+            <div style='background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: left; border: 1px solid #eee;'>
+                <h4 style='margin-top: 0; color: #333;'>How to verify for Client:</h4>
+                <ol style='color: #555; padding-left: 20px; font-size: 14px;'>
+                    <li>Check if Status is <b style='color: #28a745;'>ACTIVE</b> above.</li>
+                    <li>Update your app with the <B>newitvission</B> google-services.json.</li>
+                    <li>Run <a href=\"".url('adminpnlx/test-reminders')."\" style='color: #1a73e8; font-weight: bold;'>Test Reminders Controller</a> to trigger actual alerts.</li>
+                </ol>
+            </div>
+
+            <div style='margin-top: 40px;'>
+                <a href='".route('festivals.index')."' style='text-decoration: none; color: #5f6368; font-size: 14px;'>&larr; Back to Admin Panel</a>
+            </div>
+        </div>";
     }
 }
