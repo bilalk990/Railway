@@ -256,39 +256,53 @@ class Controller extends BaseController
     }
 
     function getFirebaseAccessToken(&$projectId = null) {
-        $keyFilePath = public_path('remyndnow-8ce2fb96e90f.json');
-        
-        // Potential workaround: check if a newer key exists
-        $files = glob(public_path('*-firebase-adminsdk-*.json'));
-        if (!empty($files)) {
-            $keyFilePath = $files[0];
-        } else {
-            $files = glob(public_path('remyndnow-b55ae-*.json'));
+        $keyData = null;
+        $source = "";
+
+        // Choice 1: Use Environment Variable (Security Best Practice)
+        $envCredentials = env('FIREBASE_CREDENTIALS');
+        if (!empty($envCredentials)) {
+            $keyData = json_decode($envCredentials, true);
+            $source = "Environment Variable";
+        }
+
+        // Choice 2: Fallback to File (Local Development Only)
+        if (!$keyData) {
+            $keyFilePath = public_path('remyndnow-8ce2fb96e90f.json');
+            $files = glob(public_path('*-firebase-adminsdk-*.json'));
             if (!empty($files)) {
                 $keyFilePath = $files[0];
+            } else {
+                $files = glob(public_path('remyndnow-b55ae-*.json'));
+                if (!empty($files)) {
+                    $keyFilePath = $files[0];
+                }
+            }
+
+            if (file_exists($keyFilePath)) {
+                $jsonContent = file_get_contents($keyFilePath);
+                $keyData = json_decode($jsonContent, true);
+                $source = "File: " . basename($keyFilePath);
             }
         }
 
-        if (!file_exists($keyFilePath)) {
-            \Log::error('FCM Error: Service account file not found at ' . $keyFilePath);
-            throw new \Exception('Service account file not found at ' . $keyFilePath);
+        if (!$keyData) {
+            \Log::error('FCM Error: No Firebase credentials found in Environment or Files.');
+            throw new \Exception('Firebase credentials not configured.');
         }
 
         try {
-            $jsonContent = file_get_contents($keyFilePath);
-            $keyData = json_decode($jsonContent, true);
-            
-            if (!$keyData || !isset($keyData['private_key']) || !isset($keyData['project_id'])) {
-                \Log::error('FCM Error: Invalid JSON or missing required fields in ' . $keyFilePath);
-                throw new \Exception('Invalid or corrupt service account key: missing private_key or project_id');
+            if (!isset($keyData['private_key']) || !isset($keyData['project_id'])) {
+                \Log::error("FCM Error: Missing required fields in $source");
+                throw new \Exception("Invalid or corrupt service account key ($source): missing private_key or project_id");
             }
 
-            $projectId = $keyData['project_id']; // Extract project ID for the URL
+            $projectId = $keyData['project_id'];
 
             // Repairing private key formatting
             $keyData['private_key'] = $this->normalizePrivateKey($keyData['private_key']);
 
-            \Log::info('FCM Info: Token fetch attempt for project: ' . $projectId . ' (client: ' . ($keyData['client_email'] ?? 'unknown') . ')');
+            \Log::info("FCM Info: Token fetch attempt for project: $projectId (Source: $source)");
 
             $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
                 'https://www.googleapis.com/auth/firebase.messaging',
@@ -300,7 +314,7 @@ class Controller extends BaseController
             if (isset($token['access_token'])) {
                 return $token['access_token'];
             } else {
-                \Log::error('FCM Error: Token fetch failed', ['response' => $token]);
+                \Log::error('FCM Error: Token fetch failed', ['response' => $token, 'source' => $source]);
                 throw new \Exception('Failed to fetch access token from Google: ' . json_encode($token));
             }
             

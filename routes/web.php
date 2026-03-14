@@ -79,24 +79,33 @@ Route::prefix('adminpnlx')->group(function () {
     });
 
     Route::get('/test-fcm-auth', function() {
-        $filename = 'remindnownew-firebase-adminsdk-fbsvc-3eecd39c76.json';
-        $path = public_path($filename);
-        if (!file_exists($path)) {
-            // Check if ANY json exists
-            $all = glob(public_path('*.json'));
-            return "File $filename NOT FOUND. Found instead: " . implode(', ', array_map('basename', $all));
+        $envCredentials = env('FIREBASE_CREDENTIALS');
+        $keyData = null;
+        $source = "";
+
+        if (!empty($envCredentials)) {
+            $keyData = json_decode($envCredentials, true);
+            $source = "Environment Variable";
+        } else {
+            $filename = 'remindnownew-firebase-adminsdk-fbsvc-3eecd39c76.json';
+            $path = public_path($filename);
+            if (file_exists($path)) {
+                $json = file_get_contents($path);
+                $keyData = json_decode($json, true);
+                $source = "File: $filename";
+            } else {
+                $all = glob(public_path('*.json'));
+                return "No credentials found in ENV or Files. Found in public: " . implode(', ', array_map('basename', $all));
+            }
         }
-        
-        $json = file_get_contents($path);
-        $keyData = json_decode($json, true);
         
         try {
             $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
             $creds = new \Google\Auth\Credentials\ServiceAccountCredentials($scopes, $keyData);
             $token = $creds->fetchAuthToken();
-            return "SUCCESS! Project: " . $keyData['project_id'] . " | Key ID: " . substr($keyData['private_key_id'], 0, 10);
+            return "SUCCESS! Source: $source | Project: " . ($keyData['project_id'] ?? 'N/A') . " | Key ID: " . substr($keyData['private_key_id'] ?? 'N/A', 0, 10);
         } catch (\Exception $e) {
-            return "ERROR: " . $e->getMessage() . " | Looking at file: $filename";
+            return "ERROR: " . $e->getMessage() . " | Source: $source";
         }
     });
 
