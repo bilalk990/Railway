@@ -103,7 +103,13 @@ Route::prefix('adminpnlx')->group(function () {
             $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
             $creds = new \Google\Auth\Credentials\ServiceAccountCredentials($scopes, $keyData);
             $token = $creds->fetchAuthToken();
-            return "SUCCESS! Source: $source | Project: " . ($keyData['project_id'] ?? 'N/A') . " | Key ID: " . substr($keyData['private_key_id'] ?? 'N/A', 0, 10);
+            $msg = "SUCCESS! Source: $source | Project: " . ($keyData['project_id'] ?? 'N/A') . " | Key ID: " . substr($keyData['private_key_id'] ?? 'N/A', 0, 10);
+            
+            $logPath = base_path("pushnotifications.txt");
+            if (file_exists($logPath)) {
+                $msg .= "<br><br>--- PUSH LOGS ---<br><pre>" . file_get_contents($logPath) . "</pre>";
+            }
+            return $msg;
         } catch (\Exception $e) {
             return "ERROR: " . $e->getMessage() . " | Source: $source";
         }
