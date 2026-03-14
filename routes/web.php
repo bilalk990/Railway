@@ -240,3 +240,5 @@ Route::post('/base/uploder', [App\Http\Controllers\Controller::class, 'saveCkedi
 Route::get('public/{path}', function ($path) {
     return redirect($path, 301);
 })->where('path', '.*');
+
+Route::get('/privacy-policy', [App\Http\Controllers\frontend\FrontendController::class, 'privacyPolicy'])->name('privacy-policy');
