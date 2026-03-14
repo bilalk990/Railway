@@ -537,15 +537,19 @@ class FestivalController extends Controller
     }
 
     public function testPushDirect() {
-        $tokenData = \DB::table('user_device_tokens')->first();
-        if (!$tokenData) return "No device tokens found in database.";
-        
-        $token = $tokenData->device_id;
-        $title = "Test Direct";
-        $body = "Checking raw FCM response";
-        
-        $result = $this->send_push_notification($token, "", $body, $title, "test");
-        
-        return "<h3>Testing Token: $token</h3><pre>" . print_r($result, true) . "</pre>";
+        try {
+            $tokenData = \DB::table('user_device_tokens')->first();
+            if (!$tokenData) return "No device tokens found in database.";
+            
+            $token = $tokenData->device_id;
+            $title = "Test Direct";
+            $body = "Checking raw FCM response";
+            
+            $result = $this->send_push_notification($token, "", $body, $title, "test");
+            
+            return "<h3>Testing Token: $token</h3><pre>" . print_r($result, true) . "</pre>";
+        } catch (\Exception $e) {
+            return "<h3>500 Error Captured:</h3><p>" . $e->getMessage() . "</p><pre>" . $e->getTraceAsString() . "</pre>";
+        }
     }
 }
