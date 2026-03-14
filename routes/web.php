@@ -121,6 +121,8 @@ Route::prefix('adminpnlx')->group(function () {
         return "<pre>" . file_get_contents($path) . "</pre>";
     });
 
+    Route::get('/test-reminders', [App\Http\Controllers\adminpnlx\FestivalController::class, 'runReminders'])->name('test-reminders');
+
     Route::middleware(['AuthAdmin'])->group(function () {
         Route::post('festivals/mark-popular', [App\Http\Controllers\adminpnlx\FestivalController::class, 'markPopular'])->name('festivals.markPopular');
          Route::resource('tiptaps', App\Http\Controllers\adminpnlx\TiptapController::class);
@@ -270,8 +272,6 @@ Route::controller(FaqController::class)->group(function () {
 
         // DEBUG: Route to check PHP limits and test Cloudinary
         Route::get('/debug-upload', [App\Http\Controllers\adminpnlx\FestivalController::class, 'debugUpload'])->name('debug-upload');
-        Route::get('/test-reminders', [App\Http\Controllers\adminpnlx\FestivalController::class, 'runReminders'])->name('test-reminders');
-        
     });
 });
 
