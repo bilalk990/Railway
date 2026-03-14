@@ -548,8 +548,8 @@ class FestivalController extends Controller
             $result = $this->send_push_notification($token, "", $body, $title, "test");
             
             return "<h3>Testing Token: $token</h3><pre>" . print_r($result, true) . "</pre>";
-        } catch (\Exception $e) {
-            return "<h3>500 Error Captured:</h3><p>" . $e->getMessage() . "</p><pre>" . $e->getTraceAsString() . "</pre>";
+        } catch (\Throwable $e) {
+            return "<h3>500 Error Captured:</h3><p>" . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine() . "</p><pre>" . $e->getTraceAsString() . "</pre>";
         }
     }
 }
