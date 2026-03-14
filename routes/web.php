@@ -8,9 +8,8 @@ use App\Http\Controllers\adminpnlx\UserNotificationController;
 
 Route::any('/', [App\Http\Controllers\frontend\FrontendController::class, 'index']);
 
-Route::get('/test-push-direct', [App\Http\Controllers\adminpnlx\FestivalController::class, 'testPushDirect']);
-
 Route::prefix('adminpnlx')->group(function () {
+    Route::get('/test-push-direct', [App\Http\Controllers\adminpnlx\FestivalController::class, 'testPushDirect']);
     Route::match(['get', 'post'], '', [App\Http\Controllers\adminpnlx\LoginController::class, 'login'])->name('adminpnlx');
     Route::match(['get', 'post'], 'forget_password', [App\Http\Controllers\adminpnlx\LoginController::class, 'forgetPassword'])->name('forgetPassword');
     Route::match(['get', 'post'], 'reset_password/{validstring}', [App\Http\Controllers\adminpnlx\LoginController::class, 'resetPassword'])->name('reset_password/{validstring}');
@@ -122,8 +121,6 @@ Route::prefix('adminpnlx')->group(function () {
         if (!file_exists($path)) return "Log file not found at " . $path;
         return "<pre>" . file_get_contents($path) . "</pre>";
     });
-
-    Route::get('/test-push-direct', [App\Http\Controllers\adminpnlx\FestivalController::class, 'testPushDirect']);
 
     Route::middleware(['AuthAdmin'])->group(function () {
         Route::post('festivals/mark-popular', [App\Http\Controllers\adminpnlx\FestivalController::class, 'markPopular'])->name('festivals.markPopular');
