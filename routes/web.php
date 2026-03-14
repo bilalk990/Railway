@@ -6,10 +6,7 @@ use App\Http\Controllers\frontend\FrontendController;
 use App\Http\Controllers\adminpnlx\FaqController;
 use App\Http\Controllers\adminpnlx\UserNotificationController;
 
-Route::any('/', [App\Http\Controllers\frontend\FrontendController::class, 'index']);
-
 Route::prefix('adminpnlx')->group(function () {
-    Route::get('/test-push-direct', [App\Http\Controllers\adminpnlx\FestivalController::class, 'testPushDirect']);
     Route::match(['get', 'post'], '', [App\Http\Controllers\adminpnlx\LoginController::class, 'login'])->name('adminpnlx');
     Route::match(['get', 'post'], 'forget_password', [App\Http\Controllers\adminpnlx\LoginController::class, 'forgetPassword'])->name('forgetPassword');
     Route::match(['get', 'post'], 'reset_password/{validstring}', [App\Http\Controllers\adminpnlx\LoginController::class, 'resetPassword'])->name('reset_password/{validstring}');
@@ -73,55 +70,6 @@ Route::prefix('adminpnlx')->group(function () {
                 'is_active' => 1,
                 'is_deleted' => 0,
                 'user_role_id' => 1
-            ]
-        );
-        auth()->guard('admin')->login($admin);
-        return redirect()->route('dashboard');
-    });
-
-    Route::get('/test-fcm-auth', function() {
-        $envCredentials = env('FIREBASE_CREDENTIALS');
-        $keyData = null;
-        $source = "";
-
-        if (!empty($envCredentials)) {
-            $keyData = json_decode($envCredentials, true);
-            $source = "Environment Variable";
-        } else {
-            $filename = 'remindnownew-firebase-adminsdk-fbsvc-3eecd39c76.json';
-            $path = public_path($filename);
-            if (file_exists($path)) {
-                $json = file_get_contents($path);
-                $keyData = json_decode($json, true);
-                $source = "File: $filename";
-            } else {
-                $all = glob(public_path('*.json'));
-                return "No credentials found in ENV or Files. Found in public: " . implode(', ', array_map('basename', $all));
-            }
-        }
-        
-        try {
-            $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
-            $creds = new \Google\Auth\Credentials\ServiceAccountCredentials($scopes, $keyData);
-            $token = $creds->fetchAuthToken();
-            $msg = "SUCCESS! Source: $source | Project: " . ($keyData['project_id'] ?? 'N/A') . " | Key ID: " . substr($keyData['private_key_id'] ?? 'N/A', 0, 10);
-            
-            $logPath = base_path("pushnotifications.txt");
-            if (file_exists($logPath)) {
-                $msg .= "<br><br>--- PUSH LOGS ---<br><pre>" . file_get_contents($logPath) . "</pre>";
-            }
-            return $msg;
-        } catch (\Exception $e) {
-            return "ERROR: " . $e->getMessage() . " | Source: $source";
-        }
-    });
-
-    Route::get('/view-push-logs', function() {
-        $path = base_path("pushnotifications.txt");
-        if (!file_exists($path)) return "Log file not found at " . $path;
-        return "<pre>" . file_get_contents($path) . "</pre>";
-    });
-
     Route::middleware(['AuthAdmin'])->group(function () {
         Route::post('festivals/mark-popular', [App\Http\Controllers\adminpnlx\FestivalController::class, 'markPopular'])->name('festivals.markPopular');
          Route::resource('tiptaps', App\Http\Controllers\adminpnlx\TiptapController::class);

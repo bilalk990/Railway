@@ -536,20 +536,5 @@ class FestivalController extends Controller
         return "<h1>Success!</h1><p>Sent $sentCount reminders immediately.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
     }
 
-    public function testPushDirect() {
-        try {
-            $tokenData = \DB::table('user_device_token')->first();
-            if (!$tokenData) return "No device tokens found in database.";
-            
-            $token = $tokenData->device_id;
-            $title = "Test Direct";
-            $body = "Checking raw FCM response";
-            
-            $result = $this->send_push_notification($token, "", $body, $title, "test");
-            
-            return "<h3>Testing Token: $token</h3><pre>" . print_r($result, true) . "</pre>";
-        } catch (\Throwable $e) {
-            return "<h3>500 Error Captured:</h3><p>" . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine() . "</p><pre>" . $e->getTraceAsString() . "</pre>";
-        }
     }
 }
