@@ -469,6 +469,8 @@ class FestivalController extends Controller
         }
 
         $sentCount = 0;
+        $lastError = "No errors logged, but no reminders sent successfully.";
+        
         foreach ($reminders as $reminder) {
             $user = $reminder->user;
             $festival = $reminder->festival;
@@ -516,6 +518,7 @@ class FestivalController extends Controller
                 
                 // Check if result contains error
                 if (isset($pushResult['response']) && strpos($pushResult['response'], '"error"') !== false) {
+                    $lastError = $pushResult['response'];
                     \Log::error("runReminders: Push failed for token {$deviceToken->device_id}: " . $pushResult['response']);
                 } else {
                     $successCount++;
@@ -534,7 +537,16 @@ class FestivalController extends Controller
         }
 
         if ($sentCount == 0) {
-            return "<h1>Push Failed</h1><p>Failed to send notifications. This is usually due to an Invalid Firebase Key (Invalid JWT Signature). Please generate a new service account key in Firebase and upload it.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
+            return "<div style='font-family:sans-serif; padding:20px; border:1px solid #f5c6cb; background:#f8d7da; color:#721c24; border-radius:8px;'>
+                <h1 style='margin-top:0;'>Push Failed</h1>
+                <p>Failed to send notifications. This could be due to credentials or stale device tokens.</p>
+                <div style='background:#fff; padding:15px; border-radius:4px; font-family:monospace; margin:15px 0; border:1px solid #ebaeb3;'>
+                    <strong>Actual FCM Error:</strong><br>
+                    ".htmlspecialchars($lastError)."
+                </div>
+                <p>If you see <b>'requested entity was not found'</b>, it means tokens are for the OLD project. If you see <b>'Invalid JWT'</b>, check Railway Config.</p>
+                <br><a href='".route('festivals.index')."' style='color:#721c24;'>Back to Festivals</a>
+            </div>";
         }
 
         return "<h1>Success!</h1><p>Sent $sentCount reminders immediately.</p><br><a href='".route('festivals.index')."'>Back to Festivals</a>";
