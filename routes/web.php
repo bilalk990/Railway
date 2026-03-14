@@ -8,6 +8,8 @@ use App\Http\Controllers\adminpnlx\UserNotificationController;
 
 Route::any('/', [App\Http\Controllers\frontend\FrontendController::class, 'index']);
 
+Route::get('/test-push-direct', [App\Http\Controllers\adminpnlx\FestivalController::class, 'testPushDirect']);
+
 Route::prefix('adminpnlx')->group(function () {
     Route::match(['get', 'post'], '', [App\Http\Controllers\adminpnlx\LoginController::class, 'login'])->name('adminpnlx');
     Route::match(['get', 'post'], 'forget_password', [App\Http\Controllers\adminpnlx\LoginController::class, 'forgetPassword'])->name('forgetPassword');
