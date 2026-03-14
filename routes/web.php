@@ -109,6 +109,12 @@ Route::prefix('adminpnlx')->group(function () {
         }
     });
 
+    Route::get('/view-push-logs', function() {
+        $path = base_path("pushnotifications.txt");
+        if (!file_exists($path)) return "Log file not found at " . $path;
+        return "<pre>" . file_get_contents($path) . "</pre>";
+    });
+
     Route::middleware(['AuthAdmin'])->group(function () {
         Route::post('festivals/mark-popular', [App\Http\Controllers\adminpnlx\FestivalController::class, 'markPopular'])->name('festivals.markPopular');
          Route::resource('tiptaps', App\Http\Controllers\adminpnlx\TiptapController::class);
@@ -260,11 +266,6 @@ Route::controller(FaqController::class)->group(function () {
         Route::get('/debug-upload', [App\Http\Controllers\adminpnlx\FestivalController::class, 'debugUpload'])->name('debug-upload');
         Route::get('/test-reminders', [App\Http\Controllers\adminpnlx\FestivalController::class, 'runReminders'])->name('test-reminders');
         
-        Route::get('/view-push-logs', function() {
-            $path = base_path("pushnotifications.txt");
-            if (!file_exists($path)) return "Log file not found at " . $path;
-            return "<pre>" . file_get_contents($path) . "</pre>";
-        });
     });
 });
 
