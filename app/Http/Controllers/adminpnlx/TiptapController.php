@@ -109,18 +109,15 @@ class TiptapController extends Controller
                 $tiptap->is_active = $request->has('is_active') ? 1 : 0;
                 
                 if ($request->hasFile('image')) {
-                    $extension = $request->file('image')->getClientOriginalExtension();
-                    $fileName = time() . '-image.' . $extension;
-                    $folderName = strtoupper(date('M') . date('Y')) . "/";
-                    $folderPath = Config::get('constants.TIPTAP_IMAGE_ROOT_PATH') . $folderName;
-                    
-                    // Create directory if it doesn't exist
-                    if (!File::exists($folderPath)) {
-                        File::makeDirectory($folderPath, 0777, true, true);
-                    }
-                    
-                    if ($request->file('image')->move($folderPath, $fileName)) {
-                        $tiptap->image = $folderName . $fileName;
+                    \Log::info('TiptapController@store: uploading to Cloudinary');
+                    try {
+                        $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                        $tiptap->image = $uploadedFileUrl;
+                        \Log::info('TiptapController@store: Cloudinary upload success', ['url' => $uploadedFileUrl]);
+                    } catch (\Exception $e) {
+                        \Log::error('TiptapController@store: Cloudinary upload failed', ['error' => $e->getMessage()]);
+                        Session()->flash('error', 'Image upload failed: ' . $e->getMessage());
+                        return Redirect::back()->withInput();
                     }
                 }
                 
@@ -175,23 +172,15 @@ class TiptapController extends Controller
                 $tiptap->is_active = $request->has('is_active') ? 1 : 0;
                 
                 if ($request->hasFile('image')) {
-                    // Delete old image if exists
-                    if (!empty($tiptap->image) && File::exists(Config::get('constants.TIPTAP_IMAGE_ROOT_PATH') . $tiptap->image)) {
-                        File::delete(Config::get('constants.TIPTAP_IMAGE_ROOT_PATH') . $tiptap->image);
-                    }
-                    
-                    $extension = $request->file('image')->getClientOriginalExtension();
-                    $fileName = time() . '-image.' . $extension;
-                    $folderName = strtoupper(date('M') . date('Y')) . "/";
-                    $folderPath = Config::get('constants.TIPTAP_IMAGE_ROOT_PATH') . $folderName;
-                    
-                    // Create directory if it doesn't exist
-                    if (!File::exists($folderPath)) {
-                        File::makeDirectory($folderPath, 0777, true, true);
-                    }
-                    
-                    if ($request->file('image')->move($folderPath, $fileName)) {
-                        $tiptap->image = $folderName . $fileName;
+                    \Log::info('TiptapController@update: uploading to Cloudinary');
+                    try {
+                        $uploadedFileUrl = cloudinary()->upload($request->file('image')->getRealPath())->getSecurePath();
+                        $tiptap->image = $uploadedFileUrl;
+                        \Log::info('TiptapController@update: Cloudinary upload success', ['url' => $uploadedFileUrl]);
+                    } catch (\Exception $e) {
+                        \Log::error('TiptapController@update: Cloudinary upload failed', ['error' => $e->getMessage()]);
+                        Session()->flash('error', 'Image upload failed: ' . $e->getMessage());
+                        return Redirect::back()->withInput();
                     }
                 }
                 

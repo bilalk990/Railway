@@ -96,11 +96,14 @@
                                     
                                     <!-- Current Image -->
                                     @if($tiptapDetails->image)
+                                        @php
+                                            $imageUrl = (strpos($tiptapDetails->image, 'http') === 0) ? $tiptapDetails->image : Config::get('constants.TIPTAP_IMAGE_PATH').$tiptapDetails->image;
+                                        @php
                                         <div class="current-image mt-3">
                                             <p class="text-muted mb-2">Current Image:</p>
                                             <div class="preview-wrapper">
-                                                <a class="fancybox-buttons" data-fancybox-group="button" href="{{ Config::get('constants.TIPTAP_IMAGE_PATH').$tiptapDetails->image }}">
-                                                    <img src="{{ Config::get('constants.TIPTAP_IMAGE_PATH').$tiptapDetails->image }}" alt="{{ $tiptapDetails->title }}" width="200" style="object-fit: cover;">
+                                                <a class="fancybox-buttons" data-fancybox-group="button" href="{{ $imageUrl }}">
+                                                    <img src="{{ $imageUrl }}" alt="{{ $tiptapDetails->title }}" width="200" style="object-fit: cover;">
                                                 </a>
                                             </div>
                                         </div>

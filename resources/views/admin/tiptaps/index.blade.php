@@ -88,8 +88,11 @@
                                             <tr>
                                                 <td>
                                                     @if(!empty($result->image))
-                                                        <a class="fancybox-buttons" data-fancybox-group="button" href="{{ Config::get('constants.TIPTAP_IMAGE_PATH').$result->image }}">
-                                                            <img src="{{ Config::get('constants.TIPTAP_IMAGE_PATH').$result->image }}" width="50" height="50">
+                                                        @php
+                                                            $imageUrl = (strpos($result->image, 'http') === 0) ? $result->image : Config::get('constants.TIPTAP_IMAGE_PATH').$result->image;
+                                                        @endphp
+                                                        <a class="fancybox-buttons" data-fancybox-group="button" href="{{ $imageUrl }}">
+                                                            <img src="{{ $imageUrl }}" width="50" height="50">
                                                         </a>
                                                     @endif
                                                 </td>

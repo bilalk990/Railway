@@ -40,8 +40,11 @@
                                 <label class="col-4 col-form-label">Image:</label>
                                 <div class="col-8">
                                     @if(!empty($tiptapDetails->image))
-                                        <a class="fancybox-buttons" data-fancybox-group="button" href="{{ Config::get('constants.TIPTAP_IMAGE_PATH').$tiptapDetails->image }}">
-                                            <img src="{{ Config::get('constants.TIPTAP_IMAGE_PATH').$tiptapDetails->image }}" width="100" height="100">
+                                        @php
+                                            $imageUrl = (strpos($tiptapDetails->image, 'http') === 0) ? $tiptapDetails->image : Config::get('constants.TIPTAP_IMAGE_PATH').$tiptapDetails->image;
+                                        @endphp
+                                        <a class="fancybox-buttons" data-fancybox-group="button" href="{{ $imageUrl }}">
+                                            <img src="{{ $imageUrl }}" width="100" height="100">
                                         </a>
                                     @else
                                         <span class="text-muted">No Image</span>
