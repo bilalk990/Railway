@@ -544,7 +544,7 @@ class FestivalController extends Controller
         $title = "Test Direct";
         $body = "Checking raw FCM response";
         
-        $result = $this->sendNotification($token, $title, $body);
+        $result = $this->send_push_notification($token, "", $body, $title, "test");
         
         return "<h3>Testing Token: $token</h3><pre>" . print_r($result, true) . "</pre>";
     }
