@@ -259,6 +259,12 @@ Route::controller(FaqController::class)->group(function () {
         // DEBUG: Route to check PHP limits and test Cloudinary
         Route::get('/debug-upload', [App\Http\Controllers\adminpnlx\FestivalController::class, 'debugUpload'])->name('debug-upload');
         Route::get('/test-reminders', [App\Http\Controllers\adminpnlx\FestivalController::class, 'runReminders'])->name('test-reminders');
+        
+        Route::get('/view-push-logs', function() {
+            $path = base_path("pushnotifications.txt");
+            if (!file_exists($path)) return "Log file not found at " . $path;
+            return "<pre>" . file_get_contents($path) . "</pre>";
+        });
     });
 });
 
