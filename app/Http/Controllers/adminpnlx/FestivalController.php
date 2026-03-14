@@ -497,7 +497,9 @@ class FestivalController extends Controller
                 'updated_at' => now(),
             ]);
 
-            $allSuccess = true;
+            $successCount = 0;
+            \Log::info("runReminders: Attempting to send to " . count($deviceTokens) . " tokens for user " . $user->id);
+
             foreach ($deviceTokens as $deviceToken) {
                 $pushResult = $this->send_push_notification(
                     $deviceToken->device_id,
@@ -514,18 +516,20 @@ class FestivalController extends Controller
                 
                 // Check if result contains error
                 if (isset($pushResult['response']) && strpos($pushResult['response'], '"error"') !== false) {
-                    $allSuccess = false;
                     \Log::error("runReminders: Push failed for token {$deviceToken->device_id}: " . $pushResult['response']);
+                } else {
+                    $successCount++;
                 }
             }
 
-            // Only mark as sent if at least one token worked or if there was no catastrophic error
-            if ($allSuccess) {
+            // Only mark as sent if at least one token worked
+            if ($successCount > 0) {
                 $reminder->sent = 1;
                 $reminder->save();
                 $sentCount++;
+                \Log::info("runReminders: Successfully sent reminder {$reminder->id} (Tokens: $successCount/".count($deviceTokens).")");
             } else {
-                \Log::warning("runReminders: Failed to send for reminder ID {$reminder->id}");
+                \Log::warning("runReminders: Total failure to send for reminder ID {$reminder->id} (all " . count($deviceTokens) . " tokens failed)");
             }
         }
 
