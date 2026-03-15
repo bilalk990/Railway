@@ -1,11 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-Route::get('/', [FrontendController::class, 'index']);
-use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\frontend\FrontendController;
+use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\adminpnlx\FaqController;
 use App\Http\Controllers\adminpnlx\UserNotificationController;
+
+Route::get('/', [FrontendController::class, 'index']);
 
 Route::prefix('adminpnlx')->group(function () {
     Route::match(['get', 'post'], '', [App\Http\Controllers\adminpnlx\LoginController::class, 'login'])->name('adminpnlx');
