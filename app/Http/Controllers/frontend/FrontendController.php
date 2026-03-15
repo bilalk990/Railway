@@ -7,6 +7,11 @@ use Illuminate\Http\Request;
 
 class FrontendController extends Controller
 {
+    public function index()
+    {
+        return redirect('/adminpnlx');
+    }
+
     public function privacyPolicy()
     {
         $CmsPage = \App\Models\Cms::where('slug', 'privacy-policy')->first();

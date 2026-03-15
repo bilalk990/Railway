@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+Route::get('/', [FrontendController::class, 'index']);
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\frontend\FrontendController;
 use App\Http\Controllers\adminpnlx\FaqController;
