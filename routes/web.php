@@ -244,3 +244,17 @@ Route::get('public/{path}', function ($path) {
 })->where('path', '.*');
 
 Route::get('/privacy-policy', [App\Http\Controllers\frontend\FrontendController::class, 'privacyPolicy'])->name('privacy-policy');
+
+Route::get('/adminpnlx/user-diagnostic', function() {
+    $totalUsers = \App\Models\User::count();
+    $customers = \App\Models\User::where('user_role_id', 2)->count();
+    $deleted = \App\Models\User::where('is_deleted', 1)->count();
+    $firstFive = \App\Models\User::take(5)->get(['id', 'user_role_id', 'email', 'is_deleted']);
+    
+    return response()->json([
+        'total_users' => $totalUsers,
+        'customers_count' => $customers,
+        'deleted_users_count' => $deleted,
+        'first_five_users' => $firstFive,
+    ]);
+});
