@@ -245,6 +245,7 @@ Route::get('public/{path}', function ($path) {
 
 Route::get('/privacy-policy', [App\Http\Controllers\frontend\FrontendController::class, 'privacyPolicy'])->name('privacy-policy');
 Route::get('/terms-conditions', [App\Http\Controllers\frontend\FrontendController::class, 'termsConditions'])->name('terms-conditions');
+Route::get('/data-deletion', [App\Http\Controllers\frontend\FrontendController::class, 'dataDeletion'])->name('data-deletion');
 
 Route::get('/adminpnlx/user-diagnostic', function() {
     $totalUsers = \App\Models\User::count();

@@ -29,4 +29,9 @@ class FrontendController extends Controller
         }
         return view('frontend.terms-conditions', compact('CmsPage'));
     }
+
+    public function dataDeletion()
+    {
+        return view('frontend.data-deletion');
+    }
 }
