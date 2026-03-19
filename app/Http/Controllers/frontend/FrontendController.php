@@ -20,4 +20,13 @@ class FrontendController extends Controller
         }
         return view('frontend.privacy-policy', compact('CmsPage'));
     }
+
+    public function termsConditions()
+    {
+        $CmsPage = \App\Models\Cms::where('slug', 'term-conditions')->first();
+        if (!$CmsPage) {
+            abort(404);
+        }
+        return view('frontend.terms-conditions', compact('CmsPage'));
+    }
 }
