@@ -38,15 +38,16 @@ class AppServiceProvider extends ServiceProvider
         }
 
         try {
-            $settingKeys = [
-                'Social.youtube',
-                'Social.facebook',
-                'Social.twitter',
-                'Social.linkedin',
-                'Site.right'
-            ];
-            
-            $settings = Setting::whereIn('key', $settingKeys)->get()->keyBy('key');
+            $settings = \Illuminate\Support\Facades\Cache::remember('site_global_settings', 86400, function() {
+                $settingKeys = [
+                    'Social.youtube',
+                    'Social.facebook',
+                    'Social.twitter',
+                    'Social.linkedin',
+                    'Site.right'
+                ];
+                return Setting::whereIn('key', $settingKeys)->get()->keyBy('key');
+            });
             
             View::share([
                 'youtube'   => $settings->get('Social.youtube'),

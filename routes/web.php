@@ -246,38 +246,3 @@ Route::get('public/{path}', function ($path) {
 Route::get('/privacy-policy', [App\Http\Controllers\frontend\FrontendController::class, 'privacyPolicy'])->name('privacy-policy');
 Route::get('/terms-conditions', [App\Http\Controllers\frontend\FrontendController::class, 'termsConditions'])->name('terms-conditions');
 Route::get('/data-deletion', [App\Http\Controllers\frontend\FrontendController::class, 'dataDeletion'])->name('data-deletion');
-
-Route::get('/adminpnlx/user-diagnostic', function() {
-    $totalUsers = \App\Models\User::count();
-    $customers = \App\Models\User::where('user_role_id', 2)->count();
-    $deleted = \App\Models\User::where('is_deleted', 1)->count();
-    $firstFive = \App\Models\User::take(5)->get(['id', 'user_role_id', 'email', 'is_deleted']);
-    
-    return response()->json([
-        'total_users' => $totalUsers,
-        'customers_count' => $customers,
-        'deleted_users_count' => $deleted,
-        'first_five_users' => $firstFive,
-    ]);
-});
-
-Route::get("/adminpnlx/fix-user-roles", function() {
-    $updated = \App\Models\User::where("user_role_id", 0)->update(["user_role_id" => 2]);
-    return "<h1>Fixed $updated users!</h1><p>All users with role 0 have been updated to role 2 (Customer).</p><br><a href=\"".route("users.index")."\">Go to Customers List</a>";
-});
-
-
-Route::get("/adminpnlx/restore-admin", function() {
-    $user = \App\Models\User::where("email", "admin@admin.com")->first();
-    if (!$user) {
-        $user = new \App\Models\User();
-        $user->name = "Admin";
-        $user->email = "admin@admin.com";
-        $user->password = \Illuminate\Support\Facades\Hash::make("Admin@123");
-    }
-    $user->user_role_id = 1; // Admin
-    $user->is_active = 1;
-    $user->is_deleted = 0;
-    $user->save();
-    return "<h1>Admin Restored!</h1><p>Email: admin@admin.com</p><p>Password: Admin@123</p><br><a href=\"".route("adminpnlx")."\">Go to Login</a>";
-});

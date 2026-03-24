@@ -214,9 +214,16 @@ class Controller extends BaseController
 
     public function current_language_id(){
 		$language_code  = session()->get('admin_applocale');
+        $session_key    = 'admin_lang_id_' . ($language_code ?: 'default');
+        
+        if (session()->has($session_key)) {
+            return session()->get($session_key);
+        }
+
         $language        = DB::table('languages')->where('lang_code',$language_code)->first();
         $language_id    = $language->id ?? 1;
 		
+        session()->put($session_key, $language_id);
 		return $language_id;
 	}
     
