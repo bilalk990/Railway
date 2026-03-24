@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\adminpnlx\FaqController;
 use App\Http\Controllers\adminpnlx\UserNotificationController;
 
+Route::get('/test-simple', function() { return "App is alive"; });
 Route::get('/', [FrontendController::class, 'index']);
 
 Route::prefix('adminpnlx')->group(function () {
