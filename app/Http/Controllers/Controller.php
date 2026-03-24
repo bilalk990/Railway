@@ -68,50 +68,53 @@ class Controller extends BaseController
 		}
 	}
 
-    public function buildTree($parentId = 0){
-		$user_id	    =	Auth::guard('admin')->user()->id;
-		$user_role_id	=	Auth::guard('admin')->user()->user_role_id;
-		$branch         =   array();
-		$elements       =   array();
-		$superadmin = Config('constants.ROLE_ID.SUPER_ADMIN_ROLE_ID');
-        $language_id  = Session()->get('sel_lang');
-		if($user_role_id == $superadmin){
-			$elements = DB::table("acls")
-                ->select("acls.*","acls.title as title")
-                ->where("acls.parent_id",$parentId)
-                ->where("acls.is_active",1)
-                ->orderBy('acls.module_order','ASC')
+    public function buildTree($parentId = 0, $allElements = null){
+        if ($allElements === null) {
+            $user_id        = Auth::guard('admin')->user()->id;
+            $user_role_id   = Auth::guard('admin')->user()->user_role_id;
+            $superadmin     = Config('constants.ROLE_ID.SUPER_ADMIN_ROLE_ID');
+
+            $allAcls = DB::table("acls")
+                ->select("acls.*", "acls.title as title")
+                ->where("acls.is_active", 1)
+                ->orderBy('acls.module_order', 'ASC')
                 ->get();
-		}else {
-			if($parentId == 0){
-				$elements = DB::table("acls")
-                    ->select("acls.*","acls.title as title")
-                    ->where("acls.parent_id",$parentId)
-                    ->where("acls.is_active",1)
-                    ->where("acls.id",DB::raw("(select admin_module_id from user_permissions where user_permissions.admin_module_id = acls.id AND is_active = 1 AND user_id = $user_id LIMIT 1)"))
-                    ->orderBy('acls.module_order','ASC')
-                    ->get();
-			}else{ 
-				$elements = 	DB::table("acls")
-                    ->where("acls.parent_id",$parentId)
-                    ->where("acls.is_active",1)
-                    ->where("acls.id",DB::raw("(select admin_sub_module_id from user_permission_actions where user_permission_actions.admin_sub_module_id = acls.id AND is_active = 1 AND user_id = $user_id LIMIT 1)"))
-                    ->orderBy('acls.module_order','ASC')
-                    ->get();  
-			}
-		}
-        
-		foreach($elements as $element){
-			if ($element->parent_id == $parentId){
-				$children = $this->buildTree($element->id);
-				if ($children){
-					$element->children = $children;
-				}
-				$branch[] = $element;
-			}
-		}
-		return $branch;
-	}
+
+            if ($user_role_id == $superadmin) {
+                $allElements = $allAcls;
+            } else {
+                $userModuleIds = DB::table('user_permissions')
+                    ->where('user_id', $user_id)
+                    ->where('is_active', 1)
+                    ->pluck('admin_module_id')
+                    ->toArray();
+
+                $userSubModuleIds = DB::table('user_permission_actions')
+                    ->where('user_id', $user_id)
+                    ->where('is_active', 1)
+                    ->pluck('admin_sub_module_id')
+                    ->toArray();
+
+                $allowedIds = array_unique(array_merge($userModuleIds, $userSubModuleIds));
+                
+                $allElements = $allAcls->filter(function($acl) use ($allowedIds) {
+                    return in_array($acl->id, $allowedIds);
+                });
+            }
+        }
+
+        $branch = array();
+        foreach ($allElements as $element) {
+            if ($element->parent_id == $parentId) {
+                $children = $this->buildTree($element->id, $allElements);
+                if ($children) {
+                    $element->children = $children;
+                }
+                $branch[] = $element;
+            }
+        }
+        return $branch;
+    }
 
 	public function arrayStripTags($array)
     {
