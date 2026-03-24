@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\adminpnlx\FaqController;
 use App\Http\Controllers\adminpnlx\UserNotificationController;
 
-Route::get('/test-simple', function() { return "App is alive"; });
 Route::get('/', [FrontendController::class, 'index']);
 
 Route::prefix('adminpnlx')->group(function () {
@@ -260,4 +259,9 @@ Route::get('/adminpnlx/user-diagnostic', function() {
         'deleted_users_count' => $deleted,
         'first_five_users' => $firstFive,
     ]);
+});
+
+Route::get("/adminpnlx/fix-user-roles", function() {
+    $updated = \App\Models\User::where("user_role_id", 0)->update(["user_role_id" => 2]);
+    return "<h1>Fixed $updated users!</h1><p>All users with role 0 have been updated to role 2 (Customer).</p><br><a href=\"".route("users.index")."\">Go to Customers List</a>";
 });

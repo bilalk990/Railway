@@ -90,7 +90,7 @@ public function signup(Request $request)
             $obj->language           = $request->input('language');
             $obj->notify             = $request->input('notify');
 
-         
+            $obj->user_role_id = 2; // Set as Customer
             $obj->is_verified = 1;
 
             $obj->save();
@@ -1076,6 +1076,7 @@ public function getPanchang(Request $request)
                 $user->phone_prefix       = $request->input('phone_prefix', '');
                 $user->phone_country_code = $request->input('phone_country_code', '');
                 $user->phone_number       = $request->input('phone_number', '');
+                $user->user_role_id = 2; // Set as Customer
                 $user->save();
             }
      // Step 4: Check if user is active
@@ -1198,6 +1199,7 @@ public function getPanchang(Request $request)
             $user->social_id   = $socialId;
             $user->is_verified = 1;
             $user->is_active   = 1;
+            $user->user_role_id = 2; // Set as Customer
             $user->save();
         }
 
