@@ -279,11 +279,9 @@ public function login(Request $request)
             ->where('is_deleted', 0)
             ->get();
 
-        $remindersByFestivalAndDate = Reminder::where('user_id', $userId)
+        $remindersByFestival = Reminder::where('user_id', $userId)
             ->get()
-            ->groupBy(function ($item) {
-                return $item->festival_id . '_' . $item->date;
-            });
+            ->groupBy('festival_id');
 
         $allFaqs = FestivalFaq::whereIn('festival_id', $festivals->pluck('id'))->get()->groupBy('festival_id');
 
@@ -324,6 +322,9 @@ public function login(Request $request)
             // Assign faqs
             $festival->faqs = $allFaqs->get($festival->id, collect());
 
+            // Check if user has ANY reminder for this festival
+            $hasReminder = isset($remindersByFestival[$festival->id]);
+
             // Split dates and process each date as a separate festival entry
             $dates = array_map('trim', explode(',', $festival->date));
             foreach ($dates as $singleDate) {
@@ -332,9 +333,8 @@ public function login(Request $request)
                 $festivalCopy = clone $festival;
                 $festivalCopy->date = $singleDate;
                 
-                // Check reminder status from memory
-                $key = $festival->id . '_' . $singleDate;
-                $festivalCopy->is_remainder = isset($remindersByFestivalAndDate[$key]) ? 1 : 0;
+                // Set remainder status based on whether user has ANY reminder for this festival
+                $festivalCopy->is_remainder = $hasReminder ? 1 : 0;
 
                 $finalFestivals->push($festivalCopy);
             }
