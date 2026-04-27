@@ -45,4 +45,9 @@ return [
         'redirect' => env('APPLE_REDIRECT_URL'),
     ],
 
+    'prokerala' => [
+        'client_id' => env('PROKERALA_CLIENT_ID'),
+        'client_secret' => env('PROKERALA_CLIENT_SECRET'),
+    ],
+
 ];

@@ -97,7 +97,7 @@ class TiptapController extends Controller
                 ),
                 array(
                     'title' => 'required|string|max:255',
-                    'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+                    'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
                 )
             );
             
@@ -158,9 +158,11 @@ class TiptapController extends Controller
             $validator = Validator::make(
                 array(
                     'title' => $request->input('title'),
+                    'image' => $request->hasFile('image') ? $request->file('image') : '',
                 ),
                 array(
                     'title' => 'required|string|max:255',
+                    'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
                 )
             );
             

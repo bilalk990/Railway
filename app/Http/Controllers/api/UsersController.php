@@ -30,6 +30,8 @@ use GuzzleHttp\Client;
 use App\Models\Reminder;
 use Redirect,Session,Auth;
 use App\Models\Tiptap;
+use App\Services\ProkeralaService;
+use Illuminate\Support\Facades\Cache;
 
 class UsersController extends Controller
 {
@@ -273,15 +275,17 @@ public function login(Request $request)
 
     public function festivals()
     {
-        $userId = auth('api')->user()->id;
+        // Get user ID if authenticated, otherwise null (for public access)
+        $userId = auth('api')->check() ? auth('api')->user()->id : null;
 
         $festivals = Festival::with(['festivalDesc'])
             ->where('is_deleted', 0)
             ->get();
 
-        $remindersByFestival = Reminder::where('user_id', $userId)
-            ->get()
-            ->groupBy('festival_id');
+        // Only fetch reminders if user is authenticated
+        $remindersByFestival = $userId 
+            ? Reminder::where('user_id', $userId)->get()->groupBy('festival_id')
+            : collect();
 
         $allFaqs = FestivalFaq::whereIn('festival_id', $festivals->pluck('id'))->get()->groupBy('festival_id');
 
@@ -430,7 +434,8 @@ public function login(Request $request)
 
     public function festivalstab(Request $request)
     {
-        $userId = auth('api')->user()->id;
+        // Get user ID if authenticated, otherwise null (for public access)
+        $userId = auth('api')->check() ? auth('api')->user()->id : null;
 
         // 1. Build Query
         $festivalsQuery = Festival::with(['festivalDesc'])
@@ -443,11 +448,12 @@ public function login(Request $request)
 
         $festivals = $festivalsQuery->get();
 
-        $remindersByFestivalAndDate = Reminder::where('user_id', $userId)
-            ->get()
-            ->groupBy(function ($item) {
+        // Only fetch reminders if user is authenticated
+        $remindersByFestivalAndDate = $userId
+            ? Reminder::where('user_id', $userId)->get()->groupBy(function ($item) {
                 return $item->festival_id . '_' . $item->date;
-            });
+            })
+            : collect();
 
         // 3. Fetch all FestivalFaqs at once
         $allFaqs = FestivalFaq::whereIn('festival_id', $festivals->pluck('id'))->get()->groupBy('festival_id');
@@ -610,6 +616,7 @@ public function updateProfile(Request $request){
 
             return response()->json([
                 'status'  => 'success',
+                'msg' => trans('Profile updated successfully'),
                 'message' => trans('Profile updated successfully'),
                 'user'    => $obj
             ]);
@@ -631,95 +638,32 @@ public function deleteAccount(){
 
 public function getPanchang(Request $request)
     {
+        $datetime = $request->datetime ?? now()->toIso8601String();
+        $lat = (float)($request->lat ?? 23.68); // Default Rajgarh
+        $lng = (float)($request->lng ?? 76.73); // Default Rajgarh
 
-        $postData = [
-        "year" => (int)$request->year,
-        "month" => (int)$request->month,
-        "date" => (int)$request->date,
-        "hours" => (int)$request->hours,
-        "minutes" => (int)$request->minutes,
-        "seconds" => (int)$request->seconds,
-        "latitude" => (float)$request->lat,
-        "longitude" => (float)$request->lng,
-        "timezone" => (float)$request->timezone,
-        "config" => [
-            "observation_point" => "topocentric",
-            "ayanamsha" => "lahiri"
-        ]
-    ];
+        // Cache for 24 hours based on date and slightly rounded location
+        $dateKey = Carbon::parse($datetime)->format('Y-m-d');
+        $cacheKey = "prokerala_panchang_{$dateKey}_" . round($lat, 2) . "_" . round($lng, 2);
 
-    $curl = curl_init();
+        $panchangData = Cache::remember($cacheKey, 86400, function () use ($datetime, $lat, $lng) {
+            $service = new ProkeralaService();
+            return $service->getPanchang($datetime, $lat, $lng);
+        });
 
-    curl_setopt_array($curl, [
-        CURLOPT_URL => 'https://json.freeastrologyapi.com/tithi-durations',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => json_encode($postData),
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-          //  'x-api-key: Tir8k0Wi1a2hDnD60J86v4Obcgtl7mCSJmh77hg4'
-             'x-api-key: ysyYvW6Nvv6CtF1q043DH92w9d6JcMfN1KVcDiu8'
-           
-        ],
-    ]);
+        if (!$panchangData) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch Panchang data'
+            ], 500);
+        }
 
-    $response = curl_exec($curl);
-    curl_close($curl);
-        
-                
-    $curl = curl_init();
-
-    curl_setopt_array($curl, [
-        CURLOPT_URL => 'https://json.freeastrologyapi.com/nakshatra-durations',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => json_encode($postData),
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-          //  'x-api-key: Tir8k0Wi1a2hDnD60J86v4Obcgtl7mCSJmh77hg4'
-          'x-api-key: ysyYvW6Nvv6CtF1q043DH92w9d6JcMfN1KVcDiu8'
-
-        ],
-    ]);
-
-    $response2 = curl_exec($curl);
-    curl_close($curl);
-    
-    $curl = curl_init();
-
-    curl_setopt_array($curl, [
-        CURLOPT_URL => 'https://json.freeastrologyapi.com/yama-gandam',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => json_encode($postData),
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-           // 'x-api-key: Tir8k0Wi1a2hDnD60J86v4Obcgtl7mCSJmh77hg4'
-           'x-api-key: ysyYvW6Nvv6CtF1q043DH92w9d6JcMfN1KVcDiu8'
-
-        ],
-    ]);
-
-    $response3 = curl_exec($curl);
-    curl_close($curl);
-
-    $tithi = json_decode($response, true);
-    $nakshatra = json_decode($response2, true);
-    $yamaGandam = json_decode($response3, true);
-    
-    // Each contains "output" which is also JSON string → decode again
-    $tithiOutput = isset($tithi['output']) ? json_decode($tithi['output'], true) : null;
-    $nakshatraOutput = isset($nakshatra['output']) ? json_decode($nakshatra['output'], true) : null;
-    $yamaGandamOutput = isset($yamaGandam['output']) ? json_decode($yamaGandam['output'], true) : null;
-    
-    return response()->json([
-        'success' => true,
-        'tithi' => $tithiOutput,
-        'nakshatra' => $nakshatraOutput,
-        'yama_gandam' => $yamaGandamOutput
-    ]);
-
+        return response()->json([
+            'success' => true,
+            'data' => $panchangData['data'] ?? []
+        ]);
     }
+
     
     
     public function createReminder(Request $request)
@@ -745,6 +689,7 @@ public function getPanchang(Request $request)
             $dates = explode(',', $festival_dates); // multiple dates
           
             $createdReminders = [];
+            $skippedDates = [];
     
             foreach ($dates as $date) {
                 $date = trim($date);
@@ -755,9 +700,39 @@ public function getPanchang(Request $request)
                 }
     
                 $festivalDate = Carbon::parse($date);
+                
+                // Skip past festival dates (before today, allow today)
+                if ($festivalDate->startOfDay()->lt(Carbon::today())) {
+                    \Log::info('createReminder: skipping past date', ['date' => $date]);
+                    $skippedDates[] = $date;
+                    continue;
+                }
     
                 // Calculate reminder date = festival date - before_days
                 $reminderDate = $festivalDate->copy()->subDays($request->before_days);
+                
+                // Skip if reminder date is before today (allow today)
+                if ($reminderDate->startOfDay()->lt(Carbon::today())) {
+                    \Log::info('createReminder: skipping past reminder date', ['reminder_date' => $reminderDate->format('Y-m-d')]);
+                    $skippedDates[] = $date;
+                    continue;
+                }
+                
+                // Check if reminder already exists for this user, festival, and date
+                $existingReminder = Reminder::where('user_id', $userId)
+                    ->where('festival_id', $request->festival_id)
+                    ->where('date', $reminderDate->format('Y-m-d'))
+                    ->first();
+                
+                if ($existingReminder) {
+                    \Log::info('createReminder: reminder already exists', [
+                        'user_id' => $userId,
+                        'festival_id' => $request->festival_id,
+                        'date' => $reminderDate->format('Y-m-d')
+                    ]);
+                    $skippedDates[] = $date;
+                    continue;
+                }
     
                 // Combine date + time
                 $reminderDateTime = Carbon::parse($reminderDate->format('Y-m-d') . " " . $reminderTime);
@@ -771,6 +746,19 @@ public function getPanchang(Request $request)
                     'is_recurring'  => 1,
                 ]);
             }
+            
+            if (empty($createdReminders)) {
+                if (!empty($skippedDates)) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'Cannot set reminder. All dates are either in the past or reminders already exist.',
+                    ], 400);
+                }
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Cannot set reminder for past festivals.',
+                ], 400);
+            }
     
             return response()->json([
                 'status'  => 'success',
@@ -783,7 +771,44 @@ public function getPanchang(Request $request)
         \Log::info('createReminder: single reminder flow');
     
         $festivalDate = Carbon::parse($request->festival_date);
+        
+        // Check if festival date is in the past (before today)
+        if ($festivalDate->startOfDay()->lt(Carbon::today())) {
+            \Log::info('createReminder: festival date is in the past', ['festival_date' => $festivalDate->format('Y-m-d')]);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Cannot set reminder for past festivals.',
+            ], 400);
+        }
+        
         $reminderDate = $festivalDate->copy()->subDays($request->before_days);
+        
+        // Check if reminder date is before today (allow today)
+        if ($reminderDate->startOfDay()->lt(Carbon::today())) {
+            \Log::info('createReminder: reminder date is in the past', ['reminder_date' => $reminderDate->format('Y-m-d')]);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Reminder date cannot be in the past. Please choose fewer days before the festival.',
+            ], 400);
+        }
+        
+        // Check if reminder already exists for this user, festival, and date
+        $existingReminder = Reminder::where('user_id', $userId)
+            ->where('festival_id', $request->festival_id)
+            ->where('date', $reminderDate->format('Y-m-d'))
+            ->first();
+        
+        if ($existingReminder) {
+            \Log::info('createReminder: reminder already exists', [
+                'user_id' => $userId,
+                'festival_id' => $request->festival_id,
+                'date' => $reminderDate->format('Y-m-d')
+            ]);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Reminder already exists for this festival on this date.',
+            ], 400);
+        }
     
         $reminderDateTime = Carbon::parse($reminderDate->format('Y-m-d') . " " . $reminderTime);
     
@@ -827,15 +852,47 @@ public function getPanchang(Request $request)
 
     public function getManageNotification()
     {
-        $userId = auth('api')->user()->id;
+        try {
+            $userId = auth('api')->user()->id;
 
-        $settings = NotificationSetting::where('user_id', $userId)->first();
+            $settings = NotificationSetting::where('user_id', $userId)->first();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Notification settings fetched successfully',
-            'data' => $settings
-        ]);
+            // If no settings exist, create default settings
+            if (!$settings) {
+                $settings = NotificationSetting::create([
+                    'user_id' => $userId,
+                    'daily_panchang' => true,
+                    'festival_notification' => true,
+                    'push_notification' => json_encode([
+                        'daily_panchang' => true,
+                        'festival_notification' => true
+                    ])
+                ]);
+            }
+
+            return response()->json([
+                'status' => true,
+                'success' => true,
+                'message' => 'Notification settings fetched successfully',
+                'data' => [
+                    'id' => $settings->id,
+                    'user_id' => $settings->user_id,
+                    'daily_panchang' => (bool)$settings->daily_panchang,
+                    'festival_notification' => (bool)$settings->festival_notification,
+                    'created_at' => $settings->created_at,
+                    'updated_at' => $settings->updated_at
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Notification settings fetch failed: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => false,
+                'success' => false,
+                'message' => 'Failed to fetch notification settings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function notificationsList()
@@ -854,25 +911,58 @@ public function getPanchang(Request $request)
 
     public function updateManageNotification(Request $request)
     {
-        $request->validate([
-            'daily_panchang' => 'nullable|boolean',
-            'festival_notification' => 'nullable|boolean'
-        ]);
-        $userId = auth('api')->user()->id;
+        try {
+            $userId = auth('api')->user()->id;
 
-        $settings = NotificationSetting::updateOrCreate(
-            ['user_id' => $userId], // condition
-            [
-                'daily_panchang' => $request->daily_panchang ?? 1,
-                'festival_notification' => $request->festival_notification ?? 1
-            ]
-        );
-    
-        return response()->json([
-            'status' => true,
-            'message' => 'Notification settings updated successfully',
-            'data' => $settings
-        ]);
+            // Get current settings or create default
+            $currentSettings = NotificationSetting::where('user_id', $userId)->first();
+            
+            // Handle boolean values properly - convert string "true"/"false" to boolean
+            $dailyPanchang = $request->has('daily_panchang') 
+                ? filter_var($request->daily_panchang, FILTER_VALIDATE_BOOLEAN) 
+                : ($currentSettings ? $currentSettings->daily_panchang : true);
+                
+            $festivalNotification = $request->has('festival_notification') 
+                ? filter_var($request->festival_notification, FILTER_VALIDATE_BOOLEAN) 
+                : ($currentSettings ? $currentSettings->festival_notification : true);
+
+            // Prepare push_notification JSON
+            $pushNotification = json_encode([
+                'daily_panchang' => $dailyPanchang,
+                'festival_notification' => $festivalNotification
+            ]);
+
+            $settings = NotificationSetting::updateOrCreate(
+                ['user_id' => $userId],
+                [
+                    'daily_panchang' => $dailyPanchang,
+                    'festival_notification' => $festivalNotification,
+                    'push_notification' => $pushNotification
+                ]
+            );
+        
+            return response()->json([
+                'status' => true,
+                'success' => true,
+                'message' => 'Notification settings updated successfully',
+                'data' => [
+                    'id' => $settings->id,
+                    'user_id' => $settings->user_id,
+                    'daily_panchang' => (bool)$settings->daily_panchang,
+                    'festival_notification' => (bool)$settings->festival_notification,
+                    'updated_at' => $settings->updated_at
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Notification settings update failed: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => false,
+                'success' => false,
+                'message' => 'Failed to update notification settings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
       public function tiptapIndex(Request $request)
     {
@@ -1116,9 +1206,13 @@ public function getPanchang(Request $request)
             ], 200);
 
         } catch (\Exception $e) {
-            \Log::info('socialLogin: success', ['user_id' => $user->id]);
+            \Log::error('socialLogin: EXCEPTION', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'provider' => $request->provider ?? 'unknown'
+            ]);
 
-        return response()->json([
+            return response()->json([
                 'status'  => 'error',
                 'message' => 'Social login failed',
                 'error'   => $e->getMessage(),

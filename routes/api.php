@@ -36,12 +36,14 @@ Route::middleware(['GuestApi'])->group(function () {
     Route::post('/panchang', [App\Http\Controllers\api\UsersController::class, 'getPanchang']);
     Route::match(['post'], 'social-login', [App\Http\Controllers\api\UsersController::class, 'socialLogin']);
     Route::post('auth/facebook', [App\Http\Controllers\api\UsersController::class, 'facebookLogin']);
+    
+    // Public festivals endpoints - no authentication required
+    Route::match(['get'], 'festivals', [App\Http\Controllers\api\UsersController::class, 'festivals']);
+    Route::match(['get'], 'festivalstab', [App\Http\Controllers\api\UsersController::class, 'festivalstab']);
 });
 
 
 Route::middleware(['AuthApi'])->group(function () {
-    Route::match(['get'], 'festivals', [App\Http\Controllers\api\UsersController::class, 'festivals']);
-    Route::match(['get'], 'festivalstab', [App\Http\Controllers\api\UsersController::class, 'festivalstab']);
      Route::match(['post'], 'update-profile', [App\Http\Controllers\api\UsersController::class, 'updateProfile']);
      Route::match(['post'], 'delete-account', [App\Http\Controllers\api\UsersController::class, 'deleteAccount']);
      Route::match(['post'], 'create-reminders', [App\Http\Controllers\api\UsersController::class, 'createReminder']);  
