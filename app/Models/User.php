@@ -20,7 +20,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name', 'email', 'password', 'social_id', 'phone_prefix', 'phone_country_code',
-        'phone_number', 'country', 'state', 'language', 'notify', 'is_verified', 'is_active', 'image',
+        'phone_number', 'country', 'state', 'language', 'notify', 'is_verified', 'is_active', 'image', 'last_login',
     ];
  
     /**
@@ -39,6 +39,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'last_login' => 'datetime',
     ];
 
     public static function getImageAttribute($value = ""){    

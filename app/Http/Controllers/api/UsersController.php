@@ -213,7 +213,9 @@ public function login(Request $request)
         $user_details = User::where("email", $email)->first();
 
         if ($user_details) {
-        
+            $user_details->last_login = now();
+            $user_details->save();
+
             Auth::loginUsingId($user_details->id);
             $user_details = User::find($user_details->id);
 
@@ -1169,6 +1171,10 @@ public function getPanchang(Request $request)
                 $user->user_role_id = 2; // Set as Customer
                 $user->save();
             }
+
+            // Update last login
+            $user->last_login = now();
+            $user->save();
      // Step 4: Check if user is active
             if ($user->is_active == 0 || $user->is_deleted == 1) {
                 return response()->json([
@@ -1296,6 +1302,10 @@ public function getPanchang(Request $request)
             $user->user_role_id = 2; // Set as Customer
             $user->save();
         }
+
+        // Update last login
+        $user->last_login = now();
+        $user->save();
 
         // Step 5: Check if account is active
         if ($user->is_active == 0 || $user->is_deleted == 1) {
